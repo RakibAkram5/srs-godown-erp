@@ -1,0 +1,49 @@
+// SRS Godown ERP — Prisma schema
+// PHASE 1: foundation only. No business tables yet.
+// Only `users` and `settings` exist here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(STAFF)
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// Single-row company/application settings.
+// Kept as a table so future phases can extend it.
+model Settings {
+  id          String   @id @default(uuid())
+  companyName String   @default("SRS Godown ERP") @map("company_name")
+  companyLogo String?  @map("company_logo")
+  phone       String?
+  address     String?
+  currency    String   @default("PKR")
+  language    String   @default("en")
+  theme       String   @default("system")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("settings")
+}
