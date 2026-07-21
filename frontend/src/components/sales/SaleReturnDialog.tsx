@@ -102,7 +102,7 @@ export function SaleReturnDialog({ sale, open, onOpenChange, currency = 'PKR' }:
                   <TableCell className="text-right">{formatCurrency(it.salePrice, currency)}</TableCell>
                   <TableCell>
                     <Input
-                      type="number"
+                      type="number" onFocus={(e) => e.target.select()}
                       min={0}
                       max={it.quantity}
                       value={qty[it.productId] ?? 0}

@@ -143,3 +143,17 @@
     display: none !important;
   }
 }
+
+/* ── Invoice print tuning (Phase 7) ───────────────────── */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+@media print {
+  /* Keep rows and the terms block from breaking across pages */
+  .print-target table { font-size: 12px; width: 100%; }
+  .print-target tr { break-inside: avoid; page-break-inside: avoid; }
+  .print-target thead { display: table-header-group; } /* repeat header each page */
+  .invoice-terms { break-inside: avoid; page-break-inside: avoid; margin-top: 16px; }
+  .print-target img { max-height: 64px; }
+}

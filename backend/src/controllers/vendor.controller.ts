@@ -14,6 +14,9 @@ export const vendorController = {
   history: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await vendorService.history(req.params.id));
   }),
+  ledger: asyncHandler(async (req: Request, res: Response) => {
+    return sendSuccess(res, await vendorService.ledger(req.params.id));
+  }),
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await vendorService.create(req.body), 'Vendor created', 201);
   }),

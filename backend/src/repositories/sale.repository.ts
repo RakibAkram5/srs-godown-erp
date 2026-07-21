@@ -8,13 +8,13 @@ export const saleRepository = {
       orderBy,
       skip,
       take,
-      include: { _count: { select: { items: true } } },
+      include: { dealer: { select: { id: true, name: true } }, items: { select: { quantity: true } }, _count: { select: { items: true } } },
     });
   },
   count(where: Prisma.SaleWhereInput) {
     return prisma.sale.count({ where });
   },
   findById(id: string) {
-    return prisma.sale.findUnique({ where: { id }, include: { items: true } });
+    return prisma.sale.findUnique({ where: { id }, include: { items: true, dealer: { select: { id: true, name: true, city: true, phone: true } } } });
   },
 };

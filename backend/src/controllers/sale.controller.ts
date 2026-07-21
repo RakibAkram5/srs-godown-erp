@@ -29,4 +29,11 @@ export const saleController = {
   listReturns: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await saleService.listReturns(req.query as SaleListQuery));
   }),
+  listPending: asyncHandler(async (_req: Request, res: Response) => {
+    return sendSuccess(res, await saleService.listPending());
+  }),
+  fulfillItem: asyncHandler(async (req: Request, res: Response) => {
+    const qty = req.body?.quantity ? Number(req.body.quantity) : undefined;
+    return sendSuccess(res, await saleService.fulfillItem(req.params.itemId, qty), 'Item fulfilled — stock updated');
+  }),
 };

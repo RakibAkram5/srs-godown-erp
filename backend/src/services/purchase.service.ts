@@ -75,10 +75,15 @@ export const purchaseService = {
     const sortOrder: 'asc' | 'desc' = query.sortOrder === 'asc' ? 'asc' : 'desc';
     const orderBy = { [sortBy]: sortOrder } as Prisma.PurchaseOrderByWithRelationInput;
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       purchaseRepository.findMany(where, orderBy, (page - 1) * limit, limit),
       purchaseRepository.count(where),
     ]);
+    const items = rows.map((r) => {
+      const { items: lineItems, ...rest } = r as typeof r & { items: { quantity: number }[] };
+      const totalQuantity = (lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
+      return { ...rest, totalQuantity, remaining: rest.totalAmount - rest.paidAmount };
+    });
 
     return { items, total, page, limit, pageCount: Math.max(1, Math.ceil(total / limit)) };
   },
@@ -105,6 +110,7 @@ export const purchaseService = {
         taxValue: input.taxValue ?? 0,
         taxAmount,
         totalAmount,
+        paidAmount: Math.min(input.paidAmount ?? 0, totalAmount),
         notes: clean(input.notes),
         status: 'DRAFT',
         items: { create: items },
@@ -144,6 +150,7 @@ export const purchaseService = {
           taxValue: input.taxValue ?? 0,
           taxAmount,
           totalAmount,
+          paidAmount: Math.min(input.paidAmount ?? 0, totalAmount),
           notes: clean(input.notes),
           items: { create: items },
         },
@@ -190,22 +197,59 @@ export const purchaseService = {
           },
         });
       }
+      const vendor = await tx.vendor.findUnique({ where: { id: purchase.vendorId } });
+      const previousBalance = vendor?.balance ?? 0;
+      const unpaid = purchase.totalAmount - purchase.paidAmount; // only the credit portion is owed
       await tx.vendor.update({
         where: { id: purchase.vendorId },
-        data: { balance: { increment: purchase.totalAmount } },
+        data: { balance: { increment: unpaid } },
       });
-      await tx.purchase.update({ where: { id: purchase.id }, data: { status: 'COMPLETED' } });
+      await tx.purchase.update({ where: { id: purchase.id }, data: { status: 'COMPLETED', previousBalance } });
     });
 
     return this.get(id);
   },
 
   async remove(id: string) {
-    const purchase = await this.get(id);
-    if (purchase.status === 'COMPLETED') {
-      throw ApiError.badRequest('Completed purchases cannot be deleted. Create a return instead.');
+    const purchase = await purchaseRepository.findById(id);
+    if (!purchase) throw ApiError.notFound('Purchase not found');
+
+    if (purchase.status !== 'COMPLETED') {
+      await prisma.purchase.delete({ where: { id } });
+      return;
     }
-    await prisma.purchase.delete({ where: { id } });
+
+    // Completed: block if there are returns tied to it.
+    const returnCount = await prisma.purchaseReturn.count({ where: { purchaseId: id } });
+    if (returnCount > 0) throw ApiError.badRequest('This purchase has returns. Delete the returns first.');
+
+    await prisma.$transaction(async (tx) => {
+      // Remove the stock this purchase had added (guard against negative).
+      for (const item of purchase.items) {
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        if (product) {
+          const newStock = Math.max(0, product.currentStock - item.quantity);
+          await tx.product.update({ where: { id: product.id }, data: { currentStock: newStock } });
+          await tx.stockMovement.create({
+            data: {
+              productId: product.id,
+              productName: product.name,
+              type: 'ADJUSTMENT',
+              quantity: -(item.quantity),
+              balanceAfter: newStock,
+              referenceType: 'PURCHASE_DELETE',
+              referenceId: purchase.id,
+              referenceNo: purchase.purchaseNo,
+              note: 'Purchase deleted — stock removed',
+            },
+          });
+        }
+      }
+      // Reverse the vendor's outstanding (only the unpaid part had been added).
+      const unpaid = purchase.totalAmount - purchase.paidAmount;
+      await tx.vendor.update({ where: { id: purchase.vendorId }, data: { balance: { decrement: unpaid } } });
+      await tx.purchase.delete({ where: { id: purchase.id } });
+    });
   },
 
   /* ── Purchase Returns ─────────────────────────────── */

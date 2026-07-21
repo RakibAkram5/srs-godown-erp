@@ -265,23 +265,23 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="purchasePrice">Purchase price</Label>
-              <Input id="purchasePrice" type="number" step="0.01" {...register('purchasePrice')} />
+              <Input id="purchasePrice" type="number" onFocus={(e) => e.target.select()} step="0.01" {...register('purchasePrice')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="salePrice">Sale price</Label>
-              <Input id="salePrice" type="number" step="0.01" {...register('salePrice')} />
+              <Input id="salePrice" type="number" onFocus={(e) => e.target.select()} step="0.01" {...register('salePrice')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="openingStock">Opening stock</Label>
-              <Input id="openingStock" type="number" {...register('openingStock')} />
+              <Input id="openingStock" type="number" onFocus={(e) => e.target.select()} {...register('openingStock')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="minimumStock">Minimum stock</Label>
-              <Input id="minimumStock" type="number" {...register('minimumStock')} />
+              <Input id="minimumStock" type="number" onFocus={(e) => e.target.select()} {...register('minimumStock')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currentStock">Current stock</Label>
-              <Input id="currentStock" type="number" {...register('currentStock')} disabled={!editing} />
+              <Input id="currentStock" type="number" onFocus={(e) => e.target.select()} {...register('currentStock')} disabled={!editing} />
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Pencil, Plus, Trash2, Truck } from 'lucide-react';
+import { History, Pencil, Plus, Trash2, Truck, Download } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SearchBar } from '@/components/common/SearchBar';
 import { Pagination } from '@/components/common/Pagination';
@@ -28,6 +28,9 @@ import {
 } from '@/components/ui/dialog';
 import { VendorFormDialog } from '@/components/vendors/VendorFormDialog';
 import { vendorsApi } from '@/services/vendors.service';
+import { exportVendorPurchasesExcel } from '@/utils/vendorDocs';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdmin } from '@/lib/navigation';
 import { settingsService } from '@/services/settings.service';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
@@ -51,6 +54,13 @@ function VendorHistoryDialog({ vendor, onClose, currency }: { vendor: Vendor | n
             Outstanding balance: <span className="font-semibold text-foreground">{formatCurrency(vendor?.balance ?? 0, currency)}</span>
           </DialogDescription>
         </DialogHeader>
+        {data && data.purchases.length > 0 && (
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => exportVendorPurchasesExcel(vendor?.name ?? 'vendor', data.purchases)}>
+              <Download className="h-4 w-4" />Export purchases
+            </Button>
+          </div>
+        )}
         {isLoading ? (
           <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
         ) : data && data.purchases.length > 0 ? (
@@ -58,9 +68,10 @@ function VendorHistoryDialog({ vendor, onClose, currency }: { vendor: Vendor | n
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Purchase No</TableHead>
+                  <TableHead>Bill No</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Products</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
               </TableHeader>
@@ -68,11 +79,14 @@ function VendorHistoryDialog({ vendor, onClose, currency }: { vendor: Vendor | n
                 {data.purchases.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.purchaseNo}</TableCell>
-                    <TableCell>{formatDate(p.purchaseDate)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDate(p.purchaseDate)}</TableCell>
                     <TableCell>
                       <Badge variant={p.status === 'COMPLETED' ? 'success' : 'secondary'}>
                         {p.status === 'COMPLETED' ? 'Completed' : 'Draft'}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[220px] text-sm text-muted-foreground">
+                      {(p.items ?? []).map((it) => `${it.productName} ×${it.quantity}`).join(', ') || '—'}
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(p.totalAmount, currency)}</TableCell>
                   </TableRow>
@@ -90,6 +104,8 @@ function VendorHistoryDialog({ vendor, onClose, currency }: { vendor: Vendor | n
 
 export default function VendorsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const admin = isAdmin(user);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [page, setPage] = useState(1);
@@ -173,7 +189,7 @@ export default function VendorsPage() {
                 <TableRow>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Phone</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
+                  {admin && <TableHead className="text-right">Outstanding</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -183,11 +199,13 @@ export default function VendorsPage() {
                   <TableRow key={v.id}>
                     <TableCell className="font-medium">{v.name}</TableCell>
                     <TableCell className="text-muted-foreground">{v.phone || '—'}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      <span className={v.balance > 0 ? 'text-warning' : undefined}>
-                        {formatCurrency(v.balance, currency)}
-                      </span>
-                    </TableCell>
+                    {admin && (
+                      <TableCell className="text-right font-semibold">
+                        <span className={v.balance > 0 ? 'text-warning' : undefined}>
+                          {formatCurrency(v.balance, currency)}
+                        </span>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch checked={v.isActive} onCheckedChange={(c) => statusMutation.mutate({ id: v.id, isActive: c })} />
@@ -196,9 +214,11 @@ export default function VendorsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setHistoryVendor(v)} aria-label="History">
-                          <History className="h-4 w-4" />
-                        </Button>
+                        {admin && (
+                          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setHistoryVendor(v)} aria-label="History">
+                            <History className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setEditing(v); setFormOpen(true); }} aria-label="Edit">
                           <Pencil className="h-4 w-4" />
                         </Button>

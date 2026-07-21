@@ -31,7 +31,7 @@ const themes: { value: Theme; label: string }[] = [
 
 const schema = z.object({
   companyName: z.string().min(1, 'Company name is required'),
-  companyLogo: z.string().url('Enter a valid URL').or(z.literal('')).optional(),
+  companyLogo: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
   currency: z.string().min(1),
@@ -127,7 +127,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="companyName">Company Name</Label>
-              <Input id="companyName" placeholder="SRS Godown ERP" {...register('companyName')} />
+              <Input id="companyName" placeholder="e.g. SRS Traders (shown on invoices)" {...register('companyName')} />
               {errors.companyName && (
                 <p className="text-sm text-destructive">{errors.companyName.message}</p>
               )}

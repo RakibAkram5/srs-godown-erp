@@ -1,5 +1,5 @@
 import { api, unwrap } from './api';
-import type { Purchase, Vendor } from '@/types';
+import type { Purchase, Vendor, VendorLedger } from '@/types';
 
 export interface VendorPayload {
   name: string;
@@ -22,6 +22,9 @@ export const vendorsApi = {
   },
   history(id: string): Promise<{ vendor: Vendor; purchases: Purchase[] }> {
     return unwrap(api.get(`/vendors/${id}/history`));
+  },
+  ledger(id: string): Promise<VendorLedger> {
+    return unwrap<VendorLedger>(api.get(`/vendors/${id}/ledger`));
   },
   create(payload: VendorPayload): Promise<Vendor> {
     return unwrap<Vendor>(api.post('/vendors', payload));

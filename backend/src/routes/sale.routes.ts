@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '@/middlewares/auth.middleware';
+import { authenticate, adminOnly } from '@/middlewares/auth.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import {
   createSaleSchema,
@@ -13,6 +13,8 @@ router.use(authenticate);
 
 router.get('/returns', saleController.listReturns);
 router.post('/returns', validate(createSaleReturnSchema), saleController.createReturn);
+router.get('/pending', adminOnly, saleController.listPending);
+router.post('/items/:itemId/fulfill', adminOnly, saleController.fulfillItem);
 
 router.get('/', saleController.list);
 router.post('/', validate(createSaleSchema), saleController.create);

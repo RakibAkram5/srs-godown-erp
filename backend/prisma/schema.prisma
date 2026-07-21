@@ -16,6 +16,7 @@ enum Role {
   ADMIN
   MANAGER
   STAFF
+  EMPLOYEE
 }
 
 enum AuditAction {
@@ -33,6 +34,7 @@ model User {
   phone        String?
   password     String
   role         Role      @default(ADMIN)
+  permissions  String[]  @default([])
   profileImage String?   @map("profile_image")
   isActive     Boolean   @default(true) @map("is_active")
   lastLogin    DateTime? @map("last_login")
@@ -222,6 +224,7 @@ model Vendor {
 
   purchases Purchase[]
   returns   PurchaseReturn[]
+  payments  Payment[]
 
   @@map("vendors")
 }
@@ -239,14 +242,16 @@ model Purchase {
   rack      String?
   shelf     String?
 
-  subTotal    Float          @default(0) @map("sub_total")
-  discount    Float          @default(0)
-  taxType     TaxType        @default(NONE) @map("tax_type")
-  taxValue    Float          @default(0) @map("tax_value")
-  taxAmount   Float          @default(0) @map("tax_amount")
-  totalAmount Float          @default(0) @map("total_amount")
-  notes       String?
-  status      PurchaseStatus @default(DRAFT)
+  subTotal        Float          @default(0) @map("sub_total")
+  discount        Float          @default(0)
+  taxType         TaxType        @default(NONE) @map("tax_type")
+  taxValue        Float          @default(0) @map("tax_value")
+  taxAmount       Float          @default(0) @map("tax_amount")
+  totalAmount     Float          @default(0) @map("total_amount")
+  paidAmount      Float          @default(0) @map("paid_amount")
+  previousBalance Float          @default(0) @map("previous_balance")
+  notes           String?
+  status          PurchaseStatus @default(DRAFT)
 
   items   PurchaseItem[]
   returns PurchaseReturn[]
@@ -352,22 +357,29 @@ model Sale {
   customerName  String? @map("customer_name")
   customerPhone String? @map("customer_phone")
 
+  dealerId String? @map("dealer_id")
+  dealer   Dealer? @relation(fields: [dealerId], references: [id])
+
   subTotal    Float      @default(0) @map("sub_total")
   discount    Float      @default(0)
   taxType     TaxType    @default(NONE) @map("tax_type")
   taxValue    Float      @default(0) @map("tax_value")
-  taxAmount   Float      @default(0) @map("tax_amount")
-  totalAmount Float      @default(0) @map("total_amount")
-  notes       String?
-  status      SaleStatus @default(DRAFT)
+  taxAmount       Float      @default(0) @map("tax_amount")
+  totalAmount     Float      @default(0) @map("total_amount")
+  paidAmount      Float      @default(0) @map("paid_amount")
+  previousBalance Float      @default(0) @map("previous_balance")
+  notes           String?
+  status          SaleStatus @default(DRAFT)
 
-  items   SaleItem[]
-  returns SaleReturn[]
+  items      SaleItem[]
+  returns    SaleReturn[]
+  dispatches Dispatch[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status])
+  @@index([dealerId])
   @@map("sales")
 }
 
@@ -376,12 +388,13 @@ model SaleItem {
   saleId String @map("sale_id")
   sale   Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
-  productId   String @map("product_id")
-  productName String @map("product_name")
-  quantity    Int
-  salePrice   Float  @map("sale_price")
-  discount    Float  @default(0)
-  lineTotal   Float  @map("line_total")
+  productId       String @map("product_id")
+  productName     String @map("product_name")
+  quantity        Int
+  pendingQuantity Int    @default(0) @map("pending_quantity")
+  salePrice       Float  @map("sale_price")
+  discount        Float  @default(0)
+  lineTotal       Float  @map("line_total")
 
   @@index([saleId])
   @@index([productId])
@@ -421,6 +434,94 @@ model SaleReturnItem {
 
   @@index([returnId])
   @@map("sale_return_items")
+}
+
+// ─────────────────────────────────────────────────────────
+// PHASE 7 — Dealers (customers we sell to, with ledger balance)
+// ─────────────────────────────────────────────────────────
+
+model Dealer {
+  id             String   @id @default(uuid())
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  city           String?
+  openingBalance Float    @default(0) @map("opening_balance")
+  balance        Float    @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+  isDeleted      Boolean  @default(false) @map("is_deleted")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sales    Sale[]
+  payments Payment[]
+
+  @@map("dealers")
+}
+
+// ─────────────────────────────────────────────────────────
+// PHASE 8 — Ledgers (payments to vendors, receipts from dealers)
+// ─────────────────────────────────────────────────────────
+
+enum PaymentType {
+  VENDOR_PAYMENT
+  DEALER_RECEIPT
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CARD
+  CHEQUE
+  OTHER
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  codeNo      Int           @unique @default(autoincrement()) @map("code_no")
+  voucherNo   String?       @unique @map("voucher_no")
+  type        PaymentType
+  amount      Float
+  method      PaymentMethod @default(CASH)
+  paymentDate DateTime      @default(now()) @map("payment_date")
+  notes       String?
+
+  vendorId String? @map("vendor_id")
+  vendor   Vendor? @relation(fields: [vendorId], references: [id])
+  dealerId String? @map("dealer_id")
+  dealer   Dealer? @relation(fields: [dealerId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([vendorId])
+  @@index([dealerId])
+  @@index([type])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────
+// PHASE 9 — Dispatch (linked to a sale invoice)
+// ─────────────────────────────────────────────────────────
+
+model Dispatch {
+  id         String   @id @default(uuid())
+  codeNo     Int      @unique @default(autoincrement()) @map("code_no")
+  dispatchNo String?  @unique @map("dispatch_no")
+
+  saleId String @map("sale_id")
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  biltyNumber     String   @map("bilty_number")
+  transporterName String   @map("transporter_name")
+  city            String
+  dispatchDate    DateTime @default(now()) @map("dispatch_date")
+  notes           String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([saleId])
+  @@map("dispatches")
 }
 
 // Single-row company/application settings.

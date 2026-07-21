@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
+import { NumberField } from '@/components/ui/NumberField';
 import { vendorsApi } from '@/services/vendors.service';
 import { productsApi } from '@/services/products.service';
 import { purchasesApi, type PurchasePayload } from '@/services/purchases.service';
@@ -52,8 +53,10 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
   const [taxType, setTaxType] = useState<TaxType>('NONE');
   const [taxValue, setTaxValue] = useState(0);
   const [notes, setNotes] = useState('');
+  const [paidAmount, setPaidAmount] = useState(0);
 
   const { data: vendors } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list(undefined, 'active') });
+  const selectedVendor = (vendors ?? []).find((v) => v.id === vendorId);
   const { data: productData } = useQuery({
     queryKey: ['products-picker'],
     queryFn: () => productsApi.list({ status: 'active', limit: 100000, sortBy: 'name', sortOrder: 'asc' }),
@@ -83,12 +86,13 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
       setTaxType(purchase.taxType);
       setTaxValue(purchase.taxValue);
       setNotes(purchase.notes ?? '');
+      setPaidAmount(purchase.paidAmount ?? 0);
     } else {
       setVendorId('');
       setPurchaseDate(new Date().toISOString().slice(0, 10));
       setWarehouse(''); setRack(''); setShelf('');
       setRows([{ ...emptyRow }]);
-      setDiscount(0); setTaxType('NONE'); setTaxValue(0); setNotes('');
+      setDiscount(0); setTaxType('NONE'); setTaxValue(0); setNotes(''); setPaidAmount(0);
     }
   }, [open, purchase]);
 
@@ -141,6 +145,7 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
         discount,
         taxType,
         taxValue,
+        paidAmount,
         notes: notes || null,
         status,
         items,
@@ -220,15 +225,15 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
                     </div>
                     <div className="col-span-3 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Qty</Label>
-                      <Input type="number" min={1} value={row.quantity} onChange={(e) => updateRow(i, { quantity: Number(e.target.value) })} />
+                      <NumberField value={row.quantity} onValueChange={(n) => updateRow(i, { quantity: n })} allowDecimal={false} />
                     </div>
                     <div className="col-span-4 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Price</Label>
-                      <Input type="number" step="0.01" value={row.purchasePrice} onChange={(e) => updateRow(i, { purchasePrice: Number(e.target.value) })} />
+                      <NumberField value={row.purchasePrice} onValueChange={(n) => updateRow(i, { purchasePrice: n })} />
                     </div>
                     <div className="col-span-3 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Discount</Label>
-                      <Input type="number" step="0.01" value={row.discount} onChange={(e) => updateRow(i, { discount: Number(e.target.value) })} />
+                      <NumberField value={row.discount} onValueChange={(n) => updateRow(i, { discount: n })} />
                     </div>
                     <div className="col-span-1 flex flex-col items-end sm:col-span-2">
                       <Label className="w-full text-right text-xs text-muted-foreground">Total</Label>
@@ -265,7 +270,7 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">Discount</span>
-                <Input type="number" step="0.01" className="h-8 w-28 text-right" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
+                <NumberField value={discount} onValueChange={setDiscount} className="h-8 w-28 text-right" />
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">Tax</span>
@@ -275,7 +280,7 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
                     <option value="PERCENT">%</option>
                     <option value="FIXED">Fixed</option>
                   </Select>
-                  <Input type="number" step="0.01" className="h-8 w-24 text-right" value={taxValue} disabled={taxType === 'NONE'} onChange={(e) => setTaxValue(Number(e.target.value))} />
+                  <NumberField value={taxValue} onValueChange={setTaxValue} disabled={taxType === 'NONE'} className="h-8 w-24 text-right" />
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -286,6 +291,26 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
                 <span>Total</span>
                 <span>{formatCurrency(totals.total, currency)}</span>
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm text-muted-foreground">Paid now</span>
+                <NumberField value={paidAmount} onValueChange={setPaidAmount} className="h-8 w-28 text-right" />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">On credit (remaining)</span>
+                <span className="font-medium text-warning">{formatCurrency(Math.max(0, totals.total - paidAmount), currency)}</span>
+              </div>
+              {selectedVendor && (
+                <div className="mt-1 space-y-1 border-t border-dashed border-border pt-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Previous balance</span>
+                    <span>{formatCurrency(selectedVendor.balance, currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-bold">
+                    <span>Grand total (with previous)</span>
+                    <span>{formatCurrency(selectedVendor.balance + Math.max(0, totals.total - paidAmount), currency)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,9 +1,57 @@
-# SRS Godown ERP — Phase 6 (Sales & Stock Outward)
+# SRS Godown ERP — Phase 11 (Auth, RBAC & User Management)
 
 A modern, fast and beginner-friendly ERP for a **bike spare parts warehouse**.
 
 **Phase 2** adds a complete, production-ready **Authentication & User Management** system on top of
 the Phase 1 foundation, without changing the existing structure, layout, theme or design.
+
+**What's new in Phase 11 — Auth, RBAC & User Management**
+
+- **Demo credentials removed** from the login page.
+- **User Management** (Admin only): create/edit/delete Managers & Employees, each with their own username/password, reset passwords, activate/deactivate.
+- **Role-Based Access Control**:
+  - **Admin** — full access to every module, reports, ledgers, settings and user management.
+  - **Manager / Employee** — only the operational modules the Admin grants (Masters, Products, Purchases, Sales, Dispatch, Dealers, Vendors).
+- **Admin-only** and hidden from everyone else: Financial Reports, Ledgers, Pending, Outstanding balances, Settings and User Management.
+- **Menus are hidden completely** (not just disabled) for unauthorized users, and **direct-URL access is blocked** by route guards.
+- **Backend APIs are protected** with role/permission middleware (e.g. payments, ledgers, pending, settings-write and user management are admin-only).
+- **Invoice footer** on every invoice (screen + PDF): *Developed by SRS Matrix · Contact: 03014334151*.
+
+**What's new in Phase 10 — Invoices, Ledgers & Reports**
+
+- **Invoice**: separate **Print** and **Save PDF** buttons; every invoice carries its unique **Bill No** (SAL-/PUR-).
+- **Purchase**: sales/purchase lists now show total **Qty** (not just line count); **completed purchases can be deleted** (stock removed + vendor balance reversed, blocked if it has returns).
+- **Vendor profile**: purchase history now shows **Date, Bill No, Bill Amount and Products**, with **Excel export** of vendor-wise purchases.
+- **Dealer**: new **City** field; dealers can be **searched by city** (e.g. Lahore).
+- **Ledgers**: proper **Debit / Credit** accounting layout for both vendor and dealer ledgers, each with **Excel export**.
+- **Reports**: one-click **Excel export** for **Sales**, **Purchases** and the **Pending ledger**.
+
+**What's new in Phase 9 — Pending & Dispatch**
+
+- **Pending (backorder)**: completing a sale no longer blocks on low stock — it delivers what's in stock and records the shortfall as **pending**.
+- **Pending tab** (in Sales): shows each pending item with its current stock; a **Fulfill** button dispatches it (deducts stock) once stock is available. Fulfilment is manual and can be partial.
+- **Purchase payment**: purchases now also record **paid vs on-credit**; only the credit portion is owed to the vendor, and the vendor ledger + purchase invoice show paid / remaining / previous balance / grand total.
+- **Out-of-stock guard**: a product with **0 stock can't be added to a sale** — the admin is told to purchase stock first (partial stock still allowed as pending).
+- **Delete completed sales**: a completed sale can now be deleted — delivered stock is restored and the dealer balance reversed (blocked if it has returns or dispatches).
+- **Payment at sale**: record how much the customer **paid now**; only the **remaining** goes to their outstanding. The invoice shows **previous balance + this bill = grand total payable**, and the sales list shows a **Paid / Due** indicator and total **quantity** sold.
+- **Dispatch**: a transport log linked to a sale invoice — **bilty number, transporter, destination city, date** — with **Excel export** for your records.
+
+**What's new in Phase 8 — Ledgers**
+
+- **Payments & receipts**: record money **paid to a vendor** or **received from a dealer**; balances update automatically.
+- **Vendor ledger**: opening balance + purchases (+), purchase returns (−) and payments (−) with a running balance.
+- **Dealer ledger**: opening balance + sales (+), sale returns (−) and receipts (−) with a running balance.
+- **Ledgers page**: separate **Vendor Ledger** and **Dealer Ledger** tabs, each with a **total payable / receivable** summary and a party selector.
+- Every payment/receipt gets an auto voucher number (PAY-… / RCV-…) and can be reversed by deleting it.
+
+**What's new in Phase 7 — Dealers & Ledger**
+
+- **Dealers**: full CRUD (name / phone / email / address, opening balance) with auto-updated **outstanding balance**.
+- **Dealer ledger**: running balance view combining completed sales and returns, oldest-to-newest.
+- **Sales ↔ Dealers**: a sale can be linked to a dealer (dropdown) or left as a walk-in / cash customer. Completing a dealer sale increases the dealer's balance; a return decreases it.
+- **Invoice upgrade**: sale & purchase invoices now show the **company logo** and **company name**, with **Urdu terms & conditions** printed at the bottom.
+- **Print / Save PDF**: invoices print on A4 with repeating headers and clean pagination for long bills (100+ items); use the browser's "Save as PDF" for a PDF copy.
+- **Fix**: number fields (qty / price / discount) now select on focus, so the leading `0` is replaced as you type.
 
 **What's new in Phase 6 — Sales & Stock Outward**
 
@@ -188,6 +236,56 @@ npm run dev                   # starts http://localhost:5000
 > The **Sales** menu is now active. Make sure products have stock (via a completed purchase),
 > then create a sale and mark it **Complete** to see stock decrease automatically.
 
+> **Adding Phase 7 (Dealers)?** It adds the `dealers` table and an optional `dealer_id` on sales — no reset needed:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> The **Dealers** menu is now active. Set your shop name in **Settings → Company Name**
+> (e.g. *SRS Traders*) and a **Company Logo URL** so they appear on printed invoices.
+
+> **Adding Phase 8 (Ledgers)?** It adds the `payments` table and relations — no reset needed:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> The **Ledgers** menu is now active. Open a vendor/dealer ledger, then use **Record Payment**
+> or **Record Receipt** to reduce their balance.
+
+> **Adding Phase 9 (Pending & Dispatch)?** It adds `dispatches` + a `pending_quantity` column — no reset needed:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> **Note:** completing a sale now delivers available stock and puts the shortfall in the **Sales → Pending**
+> tab; fulfil it later once stock arrives. The **Dispatch** menu keeps your bilty/transport log.
+
+> **Adding Phase 10?** It only adds a `city` column to dealers — no reset needed:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> The **Reports** menu is now active (Sales / Purchase / Pending Excel export). Ledgers show a
+> Debit/Credit layout with Excel export, and invoices have separate **Print** and **Save PDF** buttons.
+
+> **Adding Phase 11 (Auth & RBAC)?** It adds a `permissions` column and an `EMPLOYEE` role — no reset:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> The **Users** menu (Admin only) lets you create Managers/Employees and tick which modules they can use.
+> Financial data (ledgers, reports, pending, outstanding, settings) stays admin-only and is hidden from others.
+
 Health check: **GET** `http://localhost:5000/api/health`
 
 ### 2. Frontend
@@ -254,6 +352,12 @@ Phase 2 defines these tables:
 - **`stock_movements`** — running log of every stock change (purchase in/out, sale in/out)
 - **`sales`** / **`sale_items`** — sale invoices and their line items
 - **`sale_returns`** / **`sale_return_items`** — returns against completed sales
+- **`dealers`** — customers you sell to, with opening & outstanding balance (sales carry an optional `dealer_id`)
+- **`payments`** — money paid to vendors and received from dealers (feeds the ledgers)
+- **`sale_items.pending_quantity`** — how much of a sold line is still undelivered (backorder)
+- **`dispatches`** — transport records (bilty, transporter, city) linked to sale invoices
+- **`dealers.city`** — dealer's city, used for search/filter
+- **`users.role`** (Admin/Manager/Employee) & **`users.permissions`** — module access control
 - **`settings`** — company name, logo, phone, address, currency, language, theme, timestamps
 
 No inventory/business tables exist yet — that's by design for this phase.
@@ -306,6 +410,17 @@ npm run db:seed           # (re)seed admin + settings
 | GET/PUT/DELETE | `/api/sales/:id`           | ✅ | View / edit / delete (draft) |
 | POST   | `/api/sales/:id/complete`          | ✅ | Complete → stock outward     |
 | GET/POST | `/api/sales/returns`             | ✅ | List / create sale returns   |
+| GET/POST | `/api/dealers`                   | ✅ | List / create dealers        |
+| GET/PUT/DELETE | `/api/dealers/:id`         | ✅ | View / update / delete dealer |
+| GET    | `/api/dealers/:id/ledger`          | ✅ | Dealer ledger (running balance) |
+| PATCH  | `/api/dealers/:id/status`          | ✅ | Toggle dealer status         |
+| GET    | `/api/vendors/:id/ledger`          | ✅ | Vendor ledger (running balance) |
+| GET/POST | `/api/payments`                  | ✅ | List / record payment or receipt |
+| DELETE | `/api/payments/:id`                | ✅ | Delete & reverse a payment/receipt |
+| GET    | `/api/sales/pending`               | ✅ | Pending (backorder) items    |
+| POST   | `/api/sales/items/:itemId/fulfill` | ✅ | Fulfill a pending item (deduct stock) |
+| GET/POST | `/api/dispatches`                | ✅ | List / create dispatch records |
+| DELETE | `/api/dispatches/:id`              | ✅ | Delete a dispatch            |
 | GET    | `/api/settings`      | ✅   | Fetch workspace settings        |
 | PUT    | `/api/settings`      | ✅   | Update workspace settings       |
 

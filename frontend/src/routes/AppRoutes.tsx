@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/layouts/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
+import { AccessGuard } from './AccessGuard';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
@@ -15,8 +16,10 @@ const SalesPage = lazy(() => import('@/pages/SalesPage'));
 const DealersPage = lazy(() => import('@/pages/DealersPage'));
 const VendorsPage = lazy(() => import('@/pages/VendorsPage'));
 const LedgersPage = lazy(() => import('@/pages/LedgersPage'));
+const DispatchPage = lazy(() => import('@/pages/DispatchPage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+const UsersPage = lazy(() => import('@/pages/UsersPage'));
 
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'));
 const ServerErrorPage = lazy(() => import('@/pages/errors/ServerErrorPage'));
@@ -41,15 +44,17 @@ export function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="masters" element={<MastersPage />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="purchases" element={<PurchasesPage />} />
-            <Route path="sales" element={<SalesPage />} />
-            <Route path="dealers" element={<DealersPage />} />
-            <Route path="vendors" element={<VendorsPage />} />
-            <Route path="ledgers" element={<LedgersPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route path="masters" element={<AccessGuard module="masters"><MastersPage /></AccessGuard>} />
+            <Route path="products" element={<AccessGuard module="products"><ProductsPage /></AccessGuard>} />
+            <Route path="purchases" element={<AccessGuard module="purchases"><PurchasesPage /></AccessGuard>} />
+            <Route path="sales" element={<AccessGuard module="sales"><SalesPage /></AccessGuard>} />
+            <Route path="dispatch" element={<AccessGuard module="dispatch"><DispatchPage /></AccessGuard>} />
+            <Route path="dealers" element={<AccessGuard module="dealers"><DealersPage /></AccessGuard>} />
+            <Route path="vendors" element={<AccessGuard module="vendors"><VendorsPage /></AccessGuard>} />
+            <Route path="ledgers" element={<AccessGuard adminOnly><LedgersPage /></AccessGuard>} />
+            <Route path="reports" element={<AccessGuard adminOnly><ReportsPage /></AccessGuard>} />
+            <Route path="users" element={<AccessGuard adminOnly><UsersPage /></AccessGuard>} />
+            <Route path="settings" element={<AccessGuard adminOnly><SettingsPage /></AccessGuard>} />
           </Route>
         </Route>
 

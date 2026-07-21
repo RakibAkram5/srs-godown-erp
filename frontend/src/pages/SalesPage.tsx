@@ -6,7 +6,9 @@ import {
   ArrowUp,
   Download,
   Eye,
+  Clock,
   MoreHorizontal,
+  PackageCheck,
   Pencil,
   Plus,
   ReceiptText,
@@ -42,6 +44,8 @@ import { SaleFormDialog } from '@/components/sales/SaleFormDialog';
 import { SaleViewDialog } from '@/components/sales/SaleViewDialog';
 import { SaleReturnDialog } from '@/components/sales/SaleReturnDialog';
 import { salesApi, type SaleQuery } from '@/services/sales.service';
+import { useAuth } from '@/contexts/AuthContext';
+import { isAdmin } from '@/lib/navigation';
 import { settingsService } from '@/services/settings.service';
 import { exportSalesExcel } from '@/utils/saleDocs';
 import { formatCurrency, formatDate } from '@/utils/formatters';
@@ -50,11 +54,13 @@ import { cn } from '@/lib/utils';
 import type { Sale } from '@/types';
 
 const PAGE_SIZE = 10;
-type Tab = 'sales' | 'returns';
+type Tab = 'sales' | 'returns' | 'pending';
 type SortKey = 'saleDate' | 'totalAmount' | 'createdAt';
 
 export default function SalesPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const admin = isAdmin(user);
   const [tab, setTab] = useState<Tab>('sales');
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
@@ -111,6 +117,22 @@ export default function SalesPage() {
     enabled: tab === 'returns',
   });
 
+  const pendingQuery = useQuery({
+    queryKey: ['sale-pending'],
+    queryFn: () => salesApi.listPending(),
+    enabled: tab === 'pending',
+  });
+  const fulfillMutation = useMutation({
+    mutationFn: (itemId: string) => salesApi.fulfillItem(itemId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['sale-pending'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      toast.success('Fulfilled', `${res.fulfilled} dispatched${res.remaining > 0 ? `, ${res.remaining} still pending` : ''}.`);
+    },
+    onError: (err: Error) => toast.error('Could not fulfill', err.message),
+  });
+
   function toggleSort(key: SortKey) {
     if (sortBy === key) setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
     else { setSortBy(key); setSortOrder('desc'); }
@@ -135,6 +157,7 @@ export default function SalesPage() {
   const tabs: { id: Tab; label: string; icon: typeof ReceiptText }[] = [
     { id: 'sales', label: 'Sales', icon: ReceiptText },
     { id: 'returns', label: 'Returns', icon: Undo2 },
+    ...(admin ? [{ id: 'pending' as Tab, label: 'Pending', icon: Clock }] : []),
   ];
   const sales = salesQuery.data;
 
@@ -194,7 +217,7 @@ export default function SalesPage() {
                       <TableHead>Sale No</TableHead>
                       <TableHead><button className="inline-flex items-center gap-1" onClick={() => toggleSort('saleDate')}>Date <SortIcon column="saleDate" /></button></TableHead>
                       <TableHead>Customer</TableHead>
-                      <TableHead className="text-center">Items</TableHead>
+                      <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right"><button className="inline-flex items-center gap-1" onClick={() => toggleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></button></TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -206,9 +229,18 @@ export default function SalesPage() {
                         <TableCell><button className="font-medium hover:text-primary" onClick={() => setViewingId(s.id)}>{s.saleNo}</button></TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(s.saleDate)}</TableCell>
                         <TableCell className="text-muted-foreground">{s.customerName || 'Walk-in'}</TableCell>
-                        <TableCell className="text-center">{s._count?.items ?? 0}</TableCell>
+                        <TableCell className="text-center">{s.totalQuantity ?? s._count?.items ?? 0}</TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium">{formatCurrency(s.totalAmount, currency)}</TableCell>
-                        <TableCell><Badge variant={s.status === 'COMPLETED' ? 'success' : 'secondary'}>{s.status === 'COMPLETED' ? 'Completed' : 'Draft'}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={s.status === 'COMPLETED' ? 'success' : 'secondary'}>{s.status === 'COMPLETED' ? 'Completed' : 'Draft'}</Badge>
+                            {s.status === 'COMPLETED' && (s.remaining ?? 0) > 0 ? (
+                              <span className="text-[11px] font-medium text-warning">Due {formatCurrency(s.remaining ?? 0, currency)}</span>
+                            ) : s.status === 'COMPLETED' ? (
+                              <span className="text-[11px] font-medium text-success">Paid</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -222,12 +254,8 @@ export default function SalesPage() {
                               {s.status === 'COMPLETED' && (
                                 <DropdownMenuItem onClick={async () => { const full = await salesApi.get(s.id); setReturning(full); }}><Undo2 />Return</DropdownMenuItem>
                               )}
-                              {s.status === 'DRAFT' && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => setDeleting(s)} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 />Delete</DropdownMenuItem>
-                                </>
-                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setDeleting(s)} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 />Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -265,7 +293,7 @@ export default function SalesPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Sale</TableHead>
                       <TableHead>Customer</TableHead>
-                      <TableHead className="text-center">Items</TableHead>
+                      <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -289,6 +317,61 @@ export default function SalesPage() {
         )
       )}
 
+      {/* ── Pending tab ── */}
+      {tab === 'pending' && (
+        pendingQuery.isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : !pendingQuery.data || pendingQuery.data.length === 0 ? (
+          <EmptyState icon={PackageCheck} title="Nothing pending" description="Items that couldn't be fully delivered (out of stock) show up here." />
+        ) : (
+          <div className="rounded-lg border border-border">
+            <div className="overflow-x-auto scrollbar-thin">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Sale No</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead className="text-center">Pending</TableHead>
+                    <TableHead className="text-center">In stock</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingQuery.data.map((it) => {
+                    const canFulfill = it.availableStock > 0;
+                    return (
+                      <TableRow key={it.id}>
+                        <TableCell className="font-medium">{it.saleNo}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDate(it.saleDate)}</TableCell>
+                        <TableCell className="text-muted-foreground">{it.customer}</TableCell>
+                        <TableCell>{it.productName}</TableCell>
+                        <TableCell className="text-center font-semibold text-warning">{it.pendingQuantity}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={canFulfill ? 'text-success' : 'text-muted-foreground'}>{it.availableStock}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant={canFulfill ? 'default' : 'outline'}
+                            disabled={!canFulfill || fulfillMutation.isPending}
+                            onClick={() => fulfillMutation.mutate(it.id)}
+                          >
+                            <PackageCheck className="h-4 w-4" />
+                            {canFulfill ? `Fulfill ${Math.min(it.pendingQuantity, it.availableStock)}` : 'No stock'}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )
+      )}
+
       {/* Dialogs */}
       <SaleFormDialog open={formOpen} onOpenChange={setFormOpen} sale={editing} />
       <SaleViewDialog
@@ -303,7 +386,9 @@ export default function SalesPage() {
         open={!!deleting}
         onOpenChange={(v) => !v && setDeleting(null)}
         title="Delete sale?"
-        description={deleting ? `Draft sale ${deleting.saleNo} will be removed.` : ''}
+        description={deleting ? (deleting.status === 'COMPLETED'
+          ? `Sale ${deleting.saleNo} will be deleted. Delivered stock will be restored and the dealer's balance reversed. (Not allowed if it has returns or dispatches.)`
+          : `Draft sale ${deleting.saleNo} will be removed.`) : ''}
         confirmLabel="Delete"
         destructive
         loading={deleteMutation.isPending}

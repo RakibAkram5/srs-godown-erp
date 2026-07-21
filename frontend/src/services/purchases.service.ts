@@ -18,6 +18,7 @@ export interface PurchasePayload {
   discount?: number;
   taxType?: TaxType;
   taxValue?: number;
+  paidAmount?: number;
   notes?: string | null;
   status: 'DRAFT' | 'COMPLETED';
   items: PurchaseItemPayload[];

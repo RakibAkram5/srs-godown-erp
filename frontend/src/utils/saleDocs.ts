@@ -21,9 +21,16 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
 
   doc.setTextColor(20);
   doc.setFontSize(10);
-  doc.text(`Sale No: ${sale.saleNo ?? '-'}`, 14, 36);
+  doc.text(`Bill No: ${sale.saleNo ?? '-'}`, 14, 36);
   doc.text(`Date: ${formatDate(sale.saleDate)}`, 14, 42);
-  doc.text(`Customer: ${sale.customerName || 'Walk-in'}`, 14, 48);
+  let infoY = 48;
+  if (sale.dealer) {
+    doc.text(`Dealer: ${sale.dealer.name}`, 14, infoY); infoY += 6;
+    if (sale.dealer.city) { doc.text(`City: ${sale.dealer.city}`, 14, infoY); infoY += 6; }
+    if (sale.dealer.phone) { doc.text(`Phone: ${sale.dealer.phone}`, 14, infoY); infoY += 6; }
+  } else {
+    doc.text(`Customer: ${sale.customerName || 'Walk-in'}`, 14, infoY); infoY += 6;
+  }
   doc.text(`Status: ${sale.status}`, 140, 36);
 
   const body = (sale.items ?? []).map((it, i) => [
@@ -36,7 +43,7 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   ]);
 
   autoTable(doc, {
-    startY: 56,
+    startY: infoY + 4,
     head: [['#', 'Product', 'Qty', 'Price', 'Discount', 'Total']],
     body,
     theme: 'striped',
@@ -51,8 +58,15 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   doc.text(`Sub total: ${formatCurrency(sale.subTotal, currency)}`, right, endY, { align: 'right' });
   doc.text(`Discount: ${formatCurrency(sale.discount, currency)}`, right, endY + 6, { align: 'right' });
   doc.text(`Tax: ${formatCurrency(sale.taxAmount, currency)}`, right, endY + 12, { align: 'right' });
+  doc.setFontSize(11);
+  doc.text(`Bill total: ${formatCurrency(sale.totalAmount, currency)}`, right, endY + 20, { align: 'right' });
+  const remaining = Math.max(0, sale.totalAmount - sale.paidAmount);
+  doc.setFontSize(10);
+  doc.text(`Paid: ${formatCurrency(sale.paidAmount, currency)}`, right, endY + 27, { align: 'right' });
+  doc.text(`Remaining (this bill): ${formatCurrency(remaining, currency)}`, right, endY + 33, { align: 'right' });
+  doc.text(`Previous balance: ${formatCurrency(sale.previousBalance, currency)}`, right, endY + 39, { align: 'right' });
   doc.setFontSize(12);
-  doc.text(`Total: ${formatCurrency(sale.totalAmount, currency)}`, right, endY + 20, { align: 'right' });
+  doc.text(`Grand total payable: ${formatCurrency(sale.previousBalance + remaining, currency)}`, right, endY + 47, { align: 'right' });
 
   if (sale.notes) {
     doc.setFontSize(9);
@@ -60,6 +74,9 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
     doc.text(`Notes: ${sale.notes}`, 14, endY + 20);
   }
 
+    doc.setFontSize(8);
+  doc.setTextColor(130);
+  doc.text('Developed by SRS Matrix  |  Contact: 03014334151', 105, 290, { align: 'center' });
   doc.save(`${sale.saleNo ?? 'sale'}.pdf`);
 }
 

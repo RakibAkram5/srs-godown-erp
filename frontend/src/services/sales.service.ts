@@ -1,5 +1,5 @@
 import { api, unwrap } from './api';
-import type { Sale, SaleListResult, SaleReturn } from '@/types';
+import type { PendingItem, Sale, SaleListResult, SaleReturn } from '@/types';
 
 export interface SaleItemPayload {
   productId: string;
@@ -10,12 +10,14 @@ export interface SaleItemPayload {
 }
 
 export interface SalePayload {
+  dealerId?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
   saleDate?: string;
   discount?: number;
   taxType?: 'NONE' | 'PERCENT' | 'FIXED';
   taxValue?: number;
+  paidAmount?: number;
   notes?: string | null;
   status: 'DRAFT' | 'COMPLETED';
   items: SaleItemPayload[];
@@ -69,5 +71,11 @@ export const salesApi = {
   },
   listReturns(query: SaleQuery): Promise<{ items: SaleReturn[]; total: number; page: number; pageCount: number }> {
     return unwrap(api.get('/sales/returns', { params: cleanParams(query) }));
+  },
+  listPending(): Promise<PendingItem[]> {
+    return unwrap<PendingItem[]>(api.get('/sales/pending'));
+  },
+  fulfillItem(itemId: string, quantity?: number): Promise<{ fulfilled: number; remaining: number }> {
+    return unwrap(api.post(`/sales/items/${itemId}/fulfill`, quantity ? { quantity } : {}));
   },
 };

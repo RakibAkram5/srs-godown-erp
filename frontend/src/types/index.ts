@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'STAFF';
+export type Role = 'ADMIN' | 'MANAGER' | 'EMPLOYEE' | 'STAFF';
 export type Theme = 'light' | 'dark' | 'system';
 
 export interface User {
@@ -8,6 +8,7 @@ export interface User {
   email: string;
   phone: string | null;
   role: Role;
+  permissions: string[];
   profileImage: string | null;
   isActive: boolean;
   lastLogin: string | null;
@@ -152,6 +153,10 @@ export interface Purchase {
   taxValue: number;
   taxAmount: number;
   totalAmount: number;
+  paidAmount: number;
+  previousBalance: number;
+  remaining?: number;
+  totalQuantity?: number;
   notes: string | null;
   status: PurchaseStatus;
   items?: PurchaseItem[];
@@ -202,6 +207,7 @@ export interface SaleItem {
   productId: string;
   productName: string;
   quantity: number;
+  pendingQuantity?: number;
   salePrice: number;
   discount: number;
   lineTotal?: number;
@@ -211,6 +217,8 @@ export interface Sale {
   id: string;
   saleNo: string | null;
   saleDate: string;
+  dealerId: string | null;
+  dealer?: { id: string; name: string; city?: string | null; phone?: string | null };
   customerName: string | null;
   customerPhone: string | null;
   subTotal: number;
@@ -219,6 +227,10 @@ export interface Sale {
   taxValue: number;
   taxAmount: number;
   totalAmount: number;
+  paidAmount: number;
+  previousBalance: number;
+  remaining?: number;
+  totalQuantity?: number;
   notes: string | null;
   status: SaleStatus;
   items?: SaleItem[];
@@ -244,6 +256,92 @@ export interface SaleReturn {
   notes: string | null;
   items?: { productId: string; productName: string; quantity: number; price: number; lineTotal: number }[];
   _count?: { items: number };
+  createdAt: string;
+}
+
+export interface Dealer {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  openingBalance: number;
+  balance: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealerLedgerEntry {
+  date: string;
+  type: 'SALE' | 'RETURN' | 'RECEIPT';
+  reference: string | null;
+  amount: number;
+  balance: number;
+}
+
+export interface DealerLedger {
+  dealer: Dealer;
+  openingBalance: number;
+  entries: DealerLedgerEntry[];
+}
+
+export type PaymentType = 'VENDOR_PAYMENT' | 'DEALER_RECEIPT';
+export type PaymentMethod = 'CASH' | 'BANK' | 'CARD' | 'CHEQUE' | 'OTHER';
+
+export interface Payment {
+  id: string;
+  voucherNo: string | null;
+  type: PaymentType;
+  amount: number;
+  method: PaymentMethod;
+  paymentDate: string;
+  notes: string | null;
+  vendorId: string | null;
+  dealerId: string | null;
+  vendor?: { id: string; name: string };
+  dealer?: { id: string; name: string; city?: string | null; phone?: string | null };
+  createdAt: string;
+}
+
+export interface VendorLedgerEntry {
+  date: string;
+  type: 'PURCHASE' | 'RETURN' | 'PAYMENT';
+  reference: string | null;
+  amount: number;
+  balance: number;
+}
+
+export interface VendorLedger {
+  vendor: Vendor;
+  openingBalance: number;
+  entries: VendorLedgerEntry[];
+}
+
+export interface PendingItem {
+  id: string;
+  saleId: string;
+  saleNo: string | null;
+  saleDate: string;
+  customer: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  pendingQuantity: number;
+  availableStock: number;
+}
+
+export interface Dispatch {
+  id: string;
+  dispatchNo: string | null;
+  saleId: string;
+  sale?: { saleNo: string | null; customerName: string | null; dealer?: { name: string } };
+  biltyNumber: string;
+  transporterName: string;
+  city: string;
+  dispatchDate: string;
+  notes: string | null;
   createdAt: string;
 }
 

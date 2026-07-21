@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '@/middlewares/auth.middleware';
+import { authenticate, adminOnly } from '@/middlewares/auth.middleware';
 import { validate } from '@/middlewares/validate.middleware';
 import {
   createVendorSchema,
@@ -15,6 +15,7 @@ router.get('/', vendorController.list);
 router.post('/', validate(createVendorSchema), vendorController.create);
 router.get('/:id', vendorController.get);
 router.get('/:id/history', vendorController.history);
+router.get('/:id/ledger', adminOnly, vendorController.ledger);
 router.put('/:id', validate(updateVendorSchema), vendorController.update);
 router.patch('/:id/status', validate(vendorStatusSchema), vendorController.setStatus);
 router.delete('/:id', vendorController.remove);

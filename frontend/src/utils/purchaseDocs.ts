@@ -60,6 +60,9 @@ export function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
     doc.text(`Notes: ${purchase.notes}`, 14, endY + 20);
   }
 
+    doc.setFontSize(8);
+  doc.setTextColor(130);
+  doc.text('Developed by SRS Matrix  |  Contact: 03014334151', 105, 290, { align: 'center' });
   doc.save(`${purchase.purchaseNo ?? 'purchase'}.pdf`);
 }
 

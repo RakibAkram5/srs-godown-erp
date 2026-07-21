@@ -168,11 +168,6 @@ export default function LoginPage() {
                   Sign in
                 </Button>
               </form>
-
-              <div className="mt-5 rounded-md border border-dashed border-border bg-muted/40 p-3 text-center text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">Demo credentials</p>
-                <p className="mt-0.5">admin · admin123</p>
-              </div>
             </CardContent>
           </Card>
         </div>

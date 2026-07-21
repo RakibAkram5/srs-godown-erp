@@ -29,6 +29,7 @@ function toPublicUser(user: User) {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    permissions: user.permissions,
     profileImage: user.profileImage,
     isActive: user.isActive,
     lastLogin: user.lastLogin,

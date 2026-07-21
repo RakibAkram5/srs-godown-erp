@@ -225,7 +225,7 @@ export default function PurchasesPage() {
                       <TableHead>Purchase No</TableHead>
                       <TableHead><button className="inline-flex items-center gap-1" onClick={() => toggleSort('purchaseDate')}>Date <SortIcon column="purchaseDate" /></button></TableHead>
                       <TableHead>Vendor</TableHead>
-                      <TableHead className="text-center">Items</TableHead>
+                      <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right"><button className="inline-flex items-center gap-1" onClick={() => toggleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></button></TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -237,9 +237,18 @@ export default function PurchasesPage() {
                         <TableCell><button className="font-medium hover:text-primary" onClick={() => setViewingId(p.id)}>{p.purchaseNo}</button></TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(p.purchaseDate)}</TableCell>
                         <TableCell className="text-muted-foreground">{p.vendor?.name ?? '—'}</TableCell>
-                        <TableCell className="text-center">{p._count?.items ?? 0}</TableCell>
+                        <TableCell className="text-center">{p.totalQuantity ?? p._count?.items ?? 0}</TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium">{formatCurrency(p.totalAmount, currency)}</TableCell>
-                        <TableCell><Badge variant={p.status === 'COMPLETED' ? 'success' : 'secondary'}>{p.status === 'COMPLETED' ? 'Completed' : 'Draft'}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={p.status === 'COMPLETED' ? 'success' : 'secondary'}>{p.status === 'COMPLETED' ? 'Completed' : 'Draft'}</Badge>
+                            {p.status === 'COMPLETED' && (p.remaining ?? 0) > 0 ? (
+                              <span className="text-[11px] font-medium text-warning">Credit {formatCurrency(p.remaining ?? 0, currency)}</span>
+                            ) : p.status === 'COMPLETED' ? (
+                              <span className="text-[11px] font-medium text-success">Paid</span>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -253,12 +262,8 @@ export default function PurchasesPage() {
                               {p.status === 'COMPLETED' && (
                                 <DropdownMenuItem onClick={async () => { const full = await purchasesApi.get(p.id); setReturning(full); }}><Undo2 />Return</DropdownMenuItem>
                               )}
-                              {p.status === 'DRAFT' && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => setDeleting(p)} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 />Delete</DropdownMenuItem>
-                                </>
-                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setDeleting(p)} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 />Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -296,7 +301,7 @@ export default function PurchasesPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Purchase</TableHead>
                       <TableHead>Vendor</TableHead>
-                      <TableHead className="text-center">Items</TableHead>
+                      <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -389,7 +394,9 @@ export default function PurchasesPage() {
         open={!!deleting}
         onOpenChange={(v) => !v && setDeleting(null)}
         title="Delete purchase?"
-        description={deleting ? `Draft purchase ${deleting.purchaseNo} will be removed.` : ''}
+        description={deleting ? (deleting.status === 'COMPLETED'
+          ? `Purchase ${deleting.purchaseNo} will be deleted. The stock it added will be removed and the vendor's balance reversed. (Not allowed if it has returns.)`
+          : `Draft purchase ${deleting.purchaseNo} will be removed.`) : ''}
         confirmLabel="Delete"
         destructive
         loading={deleteMutation.isPending}

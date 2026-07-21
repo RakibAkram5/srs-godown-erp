@@ -116,7 +116,7 @@ export function VendorFormDialog({ open, onOpenChange, vendor }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="openingBalance">Opening balance (outstanding)</Label>
-            <Input id="openingBalance" type="number" step="0.01" {...register('openingBalance')} />
+            <Input id="openingBalance" type="number" onFocus={(e) => e.target.select()} step="0.01" {...register('openingBalance')} />
             <p className="text-xs text-muted-foreground">Amount you already owe this vendor, if any.</p>
           </div>
 

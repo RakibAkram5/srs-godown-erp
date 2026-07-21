@@ -110,7 +110,7 @@ export function PurchaseReturnDialog({ purchase, open, onOpenChange, currency = 
                   <TableCell className="text-right">{formatCurrency(it.purchasePrice, currency)}</TableCell>
                   <TableCell>
                     <Input
-                      type="number"
+                      type="number" onFocus={(e) => e.target.select()}
                       min={0}
                       max={it.quantity}
                       value={qty[it.productId] ?? 0}

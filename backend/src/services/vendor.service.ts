@@ -79,7 +79,46 @@ export const vendorService = {
       where: { vendorId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
+      include: { items: { select: { productName: true, quantity: true } } },
     });
     return { vendor, purchases };
+  },
+
+  // Full ledger: purchases (+), purchase returns (-), payments (-), running balance.
+  async ledger(id: string) {
+    const vendor = await this.get(id);
+
+    const purchases = await prisma.purchase.findMany({
+      where: { vendorId: id, status: 'COMPLETED' },
+      select: { purchaseNo: true, purchaseDate: true, totalAmount: true, paidAmount: true },
+    });
+    const returns = await prisma.purchaseReturn.findMany({
+      where: { vendorId: id },
+      select: { returnNo: true, returnDate: true, totalAmount: true },
+    });
+    const payments = await prisma.payment.findMany({
+      where: { vendorId: id, type: 'VENDOR_PAYMENT' },
+      select: { voucherNo: true, paymentDate: true, amount: true },
+    });
+
+    type Entry = { date: Date; type: 'PURCHASE' | 'RETURN' | 'PAYMENT'; reference: string | null; amount: number; balance: number };
+    const raw: Omit<Entry, 'balance'>[] = [
+      ...purchases.map((p) => ({ date: p.purchaseDate, type: 'PURCHASE' as const, reference: p.purchaseNo, amount: p.totalAmount })),
+      // Amount paid at the time of purchase reduces what we owe.
+      ...purchases
+        .filter((p) => p.paidAmount > 0)
+        .map((p) => ({ date: p.purchaseDate, type: 'PAYMENT' as const, reference: `${p.purchaseNo} (paid)`, amount: -p.paidAmount })),
+      ...returns.map((r) => ({ date: r.returnDate, type: 'RETURN' as const, reference: r.returnNo, amount: -r.totalAmount })),
+      ...payments.map((pm) => ({ date: pm.paymentDate, type: 'PAYMENT' as const, reference: pm.voucherNo, amount: -pm.amount })),
+    ];
+    raw.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let running = vendor.openingBalance;
+    const entries: Entry[] = raw.map((e) => {
+      running += e.amount;
+      return { ...e, balance: running };
+    });
+
+    return { vendor, openingBalance: vendor.openingBalance, entries };
   },
 };

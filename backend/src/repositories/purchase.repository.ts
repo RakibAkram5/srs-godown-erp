@@ -8,7 +8,7 @@ export const purchaseRepository = {
       orderBy,
       skip,
       take,
-      include: { vendor: { select: { id: true, name: true } }, _count: { select: { items: true } } },
+      include: { vendor: { select: { id: true, name: true } }, items: { select: { quantity: true } }, _count: { select: { items: true } } },
     });
   },
   count(where: Prisma.PurchaseWhereInput) {

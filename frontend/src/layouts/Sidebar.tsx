@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PanelLeftClose, Boxes } from 'lucide-react';
-import { navItems } from '@/lib/navigation';
+import { accessibleNav } from '@/lib/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -18,6 +19,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+  const { user } = useAuth();
+  const items = accessibleNav(user);
   return (
     <aside
       className={cn(
@@ -41,7 +44,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
       {/* Nav */}
       <TooltipProvider delayDuration={0}>
         <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-thin px-3 py-4">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const link = (
               <NavLink
                 key={item.path}

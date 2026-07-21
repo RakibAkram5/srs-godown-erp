@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table';
 import { salesApi } from '@/services/sales.service';
 import { settingsService } from '@/services/settings.service';
+import { DEFAULT_COMPANY_NAME, INVOICE_FOOTER } from '@/lib/invoice';
 import { saleInvoicePdf } from '@/utils/saleDocs';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
@@ -46,7 +47,8 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
   });
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
   const currency = settings?.currency ?? 'PKR';
-  const companyName = settings?.companyName ?? 'SRS Godown ERP';
+  const companyName = settings?.companyName || DEFAULT_COMPANY_NAME;
+  const companyLogo = settings?.companyLogo;
 
   const completeMutation = useMutation({
     mutationFn: () => salesApi.complete(sale!.id),
@@ -79,9 +81,12 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
           <>
             <div ref={invoiceRef} className="rounded-lg border border-border bg-background p-5">
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-lg font-bold">{companyName}</p>
-                  <p className="text-sm text-muted-foreground">Sale Invoice</p>
+                <div className="flex items-center gap-3">
+                  {companyLogo ? <img src={companyLogo} alt="Logo" className="h-14 w-14 rounded object-contain" /> : null}
+                  <div>
+                    <p className="text-xl font-bold">{companyName}</p>
+                    <p className="text-sm text-muted-foreground">Sale Invoice / بیل</p>
+                  </div>
                 </div>
                 <Badge variant={sale.status === 'COMPLETED' ? 'success' : 'secondary'}>
                   {sale.status === 'COMPLETED' ? 'Completed' : 'Draft'}
@@ -91,8 +96,19 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <p><span className="text-muted-foreground">No:</span> <span className="font-medium">{sale.saleNo}</span></p>
                 <p><span className="text-muted-foreground">Date:</span> {formatDate(sale.saleDate)}</p>
-                <p><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{sale.customerName || 'Walk-in'}</span></p>
-                {sale.customerPhone && <p><span className="text-muted-foreground">Phone:</span> {sale.customerPhone}</p>}
+                {sale.dealer ? (
+                  <>
+                    <p><span className="text-muted-foreground">Dealer:</span> <span className="font-medium">{sale.dealer.name}</span></p>
+                    {sale.dealer.city && <p><span className="text-muted-foreground">City:</span> {sale.dealer.city}</p>}
+                    {sale.dealer.phone && <p><span className="text-muted-foreground">Phone:</span> {sale.dealer.phone}</p>}
+                    {sale.customerName && <p><span className="text-muted-foreground">Contact:</span> {sale.customerName}</p>}
+                  </>
+                ) : (
+                  <>
+                    <p><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{sale.customerName || 'Walk-in'}</span></p>
+                    {sale.customerPhone && <p><span className="text-muted-foreground">Phone:</span> {sale.customerPhone}</p>}
+                  </>
+                )}
               </div>
 
               <div className="mt-4 overflow-x-auto">
@@ -122,17 +138,27 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
                 <div className="flex justify-between"><span className="text-muted-foreground">Sub total</span><span>{formatCurrency(sale.subTotal, currency)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>{formatCurrency(sale.discount, currency)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{formatCurrency(sale.taxAmount, currency)}</span></div>
-                <div className="flex justify-between border-t border-border pt-1 text-base font-bold"><span>Total</span><span>{formatCurrency(sale.totalAmount, currency)}</span></div>
+                <div className="flex justify-between border-t border-border pt-1 text-base font-bold"><span>Bill total</span><span>{formatCurrency(sale.totalAmount, currency)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="text-success">{formatCurrency(sale.paidAmount, currency)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Remaining (this bill)</span><span className="font-medium text-warning">{formatCurrency(Math.max(0, sale.totalAmount - sale.paidAmount), currency)}</span></div>
+                {(sale.dealerId || sale.previousBalance > 0) && (
+                  <>
+                    <div className="flex justify-between border-t border-dashed border-border pt-1"><span className="text-muted-foreground">Previous balance</span><span>{formatCurrency(sale.previousBalance, currency)}</span></div>
+                    <div className="flex justify-between text-base font-bold"><span>Grand total payable</span><span>{formatCurrency(sale.previousBalance + Math.max(0, sale.totalAmount - sale.paidAmount), currency)}</span></div>
+                  </>
+                )}
               </div>
 
               {sale.notes && <p className="mt-4 text-sm text-muted-foreground">Notes: {sale.notes}</p>}
+
+              <div className="mt-6 border-t border-border pt-2 text-center text-xs text-muted-foreground">
+                Developed by <span className="font-medium text-foreground">{INVOICE_FOOTER.developedBy}</span> · Contact: {INVOICE_FOOTER.contact}
+              </div>
             </div>
 
             <DialogFooter className="no-print flex-wrap">
               <Button variant="outline" onClick={handlePrint}><Printer className="h-4 w-4" />Print</Button>
-              <Button variant="outline" onClick={() => saleInvoicePdf(sale, { companyName, currency })}>
-                <Download className="h-4 w-4" />PDF
-              </Button>
+              <Button variant="outline" onClick={() => saleInvoicePdf(sale, { companyName, currency })}><Download className="h-4 w-4" />Save PDF</Button>
               {sale.status === 'DRAFT' && (
                 <>
                   <Button variant="outline" onClick={() => { onOpenChange(false); onEdit?.(sale); }}>
