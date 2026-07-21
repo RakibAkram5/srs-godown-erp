@@ -20,6 +20,11 @@ const DispatchPage = lazy(() => import('@/pages/DispatchPage'));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const UsersPage = lazy(() => import('@/pages/UsersPage'));
+const ExpensesPage = lazy(() => import('@/pages/ExpensesPage'));
+const SalariesPage = lazy(() => import('@/pages/SalariesPage'));
+const FinancialPage = lazy(() => import('@/pages/FinancialPage'));
+const PaymentsPage = lazy(() => import('@/pages/PaymentsPage'));
+const PendingLedgerPage = lazy(() => import('@/pages/PendingLedgerPage'));
 
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'));
 const ServerErrorPage = lazy(() => import('@/pages/errors/ServerErrorPage'));
@@ -52,7 +57,12 @@ export function AppRoutes() {
             <Route path="dealers" element={<AccessGuard module="dealers"><DealersPage /></AccessGuard>} />
             <Route path="vendors" element={<AccessGuard module="vendors"><VendorsPage /></AccessGuard>} />
             <Route path="ledgers" element={<AccessGuard adminOnly><LedgersPage /></AccessGuard>} />
+            <Route path="payments" element={<AccessGuard adminOnly><PaymentsPage /></AccessGuard>} />
+            <Route path="pending-ledger" element={<AccessGuard adminOnly><PendingLedgerPage /></AccessGuard>} />
             <Route path="reports" element={<AccessGuard adminOnly><ReportsPage /></AccessGuard>} />
+            <Route path="expenses" element={<AccessGuard adminOnly><ExpensesPage /></AccessGuard>} />
+            <Route path="salaries" element={<AccessGuard adminOnly><SalariesPage /></AccessGuard>} />
+            <Route path="financial" element={<AccessGuard adminOnly><FinancialPage /></AccessGuard>} />
             <Route path="users" element={<AccessGuard adminOnly><UsersPage /></AccessGuard>} />
             <Route path="settings" element={<AccessGuard adminOnly><SettingsPage /></AccessGuard>} />
           </Route>

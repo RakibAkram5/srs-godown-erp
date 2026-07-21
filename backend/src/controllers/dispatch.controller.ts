@@ -10,6 +10,9 @@ export const dispatchController = {
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await dispatchService.create(req.body), 'Dispatch recorded', 201);
   }),
+  update: asyncHandler(async (req: Request, res: Response) => {
+    return sendSuccess(res, await dispatchService.update(req.params.id, req.body), 'Dispatch updated');
+  }),
   remove: asyncHandler(async (req: Request, res: Response) => {
     await dispatchService.remove(req.params.id);
     return sendSuccess(res, null, 'Dispatch deleted');

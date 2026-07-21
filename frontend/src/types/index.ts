@@ -275,7 +275,7 @@ export interface Dealer {
 
 export interface DealerLedgerEntry {
   date: string;
-  type: 'SALE' | 'RETURN' | 'RECEIPT';
+  type: 'SALE' | 'RETURN' | 'RECEIPT' | 'ADJUSTMENT';
   reference: string | null;
   amount: number;
   balance: number;
@@ -307,7 +307,7 @@ export interface Payment {
 
 export interface VendorLedgerEntry {
   date: string;
-  type: 'PURCHASE' | 'RETURN' | 'PAYMENT';
+  type: 'PURCHASE' | 'RETURN' | 'PAYMENT' | 'ADJUSTMENT';
   reference: string | null;
   amount: number;
   balance: number;
@@ -343,6 +343,64 @@ export interface Dispatch {
   dispatchDate: string;
   notes: string | null;
   createdAt: string;
+}
+
+export type PayMethod = 'CASH' | 'BANK' | 'CARD' | 'CHEQUE' | 'OTHER';
+
+export interface Expense {
+  id: string;
+  expenseNo: string | null;
+  category: string;
+  amount: number;
+  expenseDate: string;
+  method: PayMethod;
+  description: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface Salary {
+  id: string;
+  salaryNo: string | null;
+  employeeName: string;
+  userId: string | null;
+  month: string;
+  amount: number;
+  paidAmount: number;
+  paymentDate: string | null;
+  method: PayMethod;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface FinancialReport {
+  period: { from: string; to: string };
+  sales: { count: number; total: number; received: number };
+  purchases: { count: number; total: number; paid: number };
+  expenses: { count: number; total: number; byCategory: { category: string; amount: number }[] };
+  salaries: { count: number; total: number; paid: number };
+  outstanding: { receivable: number; payable: number };
+  pending: { count: number; value: number };
+  netProfit: number;
+}
+
+export interface PendingLedgerRow {
+  id: string;
+  no: string | null;
+  date: string;
+  party: string;
+  total: number;
+  paid: number;
+  remaining: number;
+}
+
+export interface PendingLedgerResult {
+  type: 'sales' | 'purchases';
+  items: PendingLedgerRow[];
+  total: number;
+  page: number;
+  pageCount: number;
+  totalRemaining: number;
 }
 
 export interface Settings {

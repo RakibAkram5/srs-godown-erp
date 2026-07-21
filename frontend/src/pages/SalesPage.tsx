@@ -47,7 +47,7 @@ import { salesApi, type SaleQuery } from '@/services/sales.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdmin } from '@/lib/navigation';
 import { settingsService } from '@/services/settings.service';
-import { exportSalesExcel } from '@/utils/saleDocs';
+import { exportSalesReport } from '@/utils/reportExports';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,7 @@ export default function SalesPage() {
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
   const currency = settings?.currency ?? 'PKR';
+  const meta = { companyName: settings?.companyName || 'SRS Traders', logoUrl: settings?.companyLogo, currency };
 
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -147,7 +148,7 @@ export default function SalesPage() {
     try {
       const all = await salesApi.list({ ...query, page: 1, limit: 100000 });
       if (all.items.length === 0) return toast.error('Nothing to export');
-      exportSalesExcel(all.items);
+      await exportSalesReport(all.items, meta);
       toast.success('Exported', `${all.items.length} sales exported.`);
     } catch (err) {
       toast.error('Export failed', err instanceof Error ? err.message : 'Try again.');

@@ -17,6 +17,9 @@ export const vendorController = {
   ledger: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await vendorService.ledger(req.params.id));
   }),
+  adjust: asyncHandler(async (req: Request, res: Response) => {
+    return sendSuccess(res, await vendorService.adjust(req.params.id, Number(req.body.amount), req.body.reason), 'Balance adjusted');
+  }),
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await vendorService.create(req.body), 'Vendor created', 201);
   }),

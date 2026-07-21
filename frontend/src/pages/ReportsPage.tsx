@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart3, Clock, Download, ReceiptText, ShoppingCart } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { salesApi } from '@/services/sales.service';
 import { purchasesApi } from '@/services/purchases.service';
-import { exportSalesExcel } from '@/utils/saleDocs';
-import { exportPurchasesExcel } from '@/utils/purchaseDocs';
-import { formatDate } from '@/utils/formatters';
+import { reportsApi } from '@/services/reports.service';
+import { settingsService } from '@/services/settings.service';
+import { exportSalesReport, exportPurchasesReport, exportPendingLedgerReport } from '@/utils/reportExports';
 import { toast } from '@/utils/toast';
 
 type ReportKey = 'sales' | 'purchases' | 'pending';
@@ -15,11 +15,13 @@ type ReportKey = 'sales' | 'purchases' | 'pending';
 const reports: { key: ReportKey; title: string; description: string; icon: typeof ReceiptText }[] = [
   { key: 'sales', title: 'Sales Report', description: 'All sales with customer, totals, paid and remaining amounts.', icon: ReceiptText },
   { key: 'purchases', title: 'Purchase Report', description: 'All purchases with vendor, totals, paid and credit amounts.', icon: ShoppingCart },
-  { key: 'pending', title: 'Pending Ledger', description: 'Undelivered (backorder) items awaiting stock, per sale.', icon: Clock },
+  { key: 'pending', title: 'Pending Ledger', description: 'All unpaid & partially-paid sales invoices to collect.', icon: Clock },
 ];
 
 export default function ReportsPage() {
   const [busy, setBusy] = useState<ReportKey | null>(null);
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
+  const meta = { companyName: settings?.companyName || 'SRS Traders', logoUrl: settings?.companyLogo, currency: settings?.currency ?? 'PKR' };
 
   async function run(key: ReportKey) {
     setBusy(key);
@@ -27,30 +29,18 @@ export default function ReportsPage() {
       if (key === 'sales') {
         const all = await salesApi.list({ page: 1, limit: 100000, sortBy: 'saleDate', sortOrder: 'desc' });
         if (all.items.length === 0) return toast.error('Nothing to export', 'No sales found.');
-        exportSalesExcel(all.items, 'sales-report.xlsx');
+        await exportSalesReport(all.items, meta);
         toast.success('Sales report exported', `${all.items.length} sales.`);
       } else if (key === 'purchases') {
         const all = await purchasesApi.list({ page: 1, limit: 100000, sortBy: 'purchaseDate', sortOrder: 'desc' });
         if (all.items.length === 0) return toast.error('Nothing to export', 'No purchases found.');
-        exportPurchasesExcel(all.items, 'purchase-report.xlsx');
+        await exportPurchasesReport(all.items, meta);
         toast.success('Purchase report exported', `${all.items.length} purchases.`);
       } else {
-        const items = await salesApi.listPending();
-        if (items.length === 0) return toast.error('Nothing to export', 'No pending items.');
-        const rows = items.map((it) => ({
-          'Sale No': it.saleNo ?? '',
-          Date: formatDate(it.saleDate),
-          Customer: it.customer,
-          Product: it.productName,
-          Ordered: it.quantity,
-          Pending: it.pendingQuantity,
-          'In stock': it.availableStock,
-        }));
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Pending');
-        XLSX.writeFile(wb, 'pending-ledger.xlsx');
-        toast.success('Pending ledger exported', `${items.length} items.`);
+        const all = await reportsApi.pendingLedger({ type: 'sales', page: 1, limit: 100000 });
+        if (all.items.length === 0) return toast.error('Nothing to export', 'No unpaid sales.');
+        await exportPendingLedgerReport(all.items, 'sales', meta);
+        toast.success('Pending ledger exported', `${all.items.length} invoices.`);
       }
     } catch (err) {
       toast.error('Export failed', err instanceof Error ? err.message : 'Try again.');
@@ -63,7 +53,7 @@ export default function ReportsPage() {
     <div>
       <PageHeader
         title="Reports"
-        description="Download your data as Excel for records and analysis."
+        description="Download professional Excel reports with company header, totals and formatting."
         icon={<BarChart3 className="h-5 w-5" />}
       />
 

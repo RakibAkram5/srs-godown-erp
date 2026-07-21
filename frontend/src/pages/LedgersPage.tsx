@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDownLeft, ArrowUpRight, BookOpen, Download, Plus, Truck, Store } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, BookOpen, Download, Plus, Scale, Truck, Store } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PaymentFormDialog } from '@/components/ledgers/PaymentFormDialog';
+import { AdjustBalanceDialog } from '@/components/ledgers/AdjustBalanceDialog';
 import { vendorsApi } from '@/services/vendors.service';
 import { dealersApi } from '@/services/dealers.service';
 import { settingsService } from '@/services/settings.service';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { exportVendorLedgerExcel, exportDealerLedgerExcel } from '@/utils/ledgerDocs';
+import { exportVendorLedgerReport, exportDealerLedgerReport } from '@/utils/reportExports';
 import { cn } from '@/lib/utils';
 
 type Tab = 'vendor' | 'dealer';
@@ -39,8 +40,8 @@ function SummaryCard({ label, value, icon: Icon, tone }: { label: string; value:
   );
 }
 
-const vendorTypeLabel: Record<string, string> = { PURCHASE: 'Purchase', RETURN: 'Return', PAYMENT: 'Payment' };
-const dealerTypeLabel: Record<string, string> = { SALE: 'Sale', RETURN: 'Return', RECEIPT: 'Receipt' };
+const vendorTypeLabel: Record<string, string> = { PURCHASE: 'Purchase', RETURN: 'Return', PAYMENT: 'Payment', ADJUSTMENT: 'Adjustment' };
+const dealerTypeLabel: Record<string, string> = { SALE: 'Sale', RETURN: 'Return', RECEIPT: 'Receipt', ADJUSTMENT: 'Adjustment' };
 
 export default function LedgersPage() {
   const [tab, setTab] = useState<Tab>('vendor');
@@ -48,9 +49,11 @@ export default function LedgersPage() {
   const [dealerId, setDealerId] = useState('');
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [adjust, setAdjust] = useState<{ type: 'vendor' | 'dealer'; id: string; name: string } | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
   const currency = settings?.currency ?? 'PKR';
+  const meta = { companyName: settings?.companyName || 'SRS Traders', logoUrl: settings?.companyLogo, currency };
 
   const { data: vendors } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list() });
   const { data: dealers } = useQuery({ queryKey: ['dealers'], queryFn: () => dealersApi.list() });
@@ -122,7 +125,10 @@ export default function LedgersPage() {
                   <p className="font-semibold">{vendorLedger.data.vendor.name}</p>
                   <p className="text-sm text-muted-foreground">Outstanding: <span className="font-bold text-foreground">{formatCurrency(vendorLedger.data.vendor.balance, currency)}</span></p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => exportVendorLedgerExcel(vendorLedger.data!)}><Download className="h-4 w-4" />Export</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAdjust({ type: 'vendor', id: vendorLedger.data!.vendor.id, name: vendorLedger.data!.vendor.name })}><Scale className="h-4 w-4" />Adjust</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportVendorLedgerReport(vendorLedger.data!, meta)}><Download className="h-4 w-4" />Export</Button>
+                </div>
               </div>
               <div className="overflow-x-auto scrollbar-thin">
                 <Table>
@@ -188,7 +194,10 @@ export default function LedgersPage() {
                   <p className="font-semibold">{dealerLedger.data.dealer.name}</p>
                   <p className="text-sm text-muted-foreground">Outstanding: <span className="font-bold text-foreground">{formatCurrency(dealerLedger.data.dealer.balance, currency)}</span></p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => exportDealerLedgerExcel(dealerLedger.data!)}><Download className="h-4 w-4" />Export</Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setAdjust({ type: 'dealer', id: dealerLedger.data!.dealer.id, name: dealerLedger.data!.dealer.name })}><Scale className="h-4 w-4" />Adjust</Button>
+                  <Button variant="outline" size="sm" onClick={() => exportDealerLedgerReport(dealerLedger.data!, meta)}><Download className="h-4 w-4" />Export</Button>
+                </div>
               </div>
               <div className="overflow-x-auto scrollbar-thin">
                 <Table>
@@ -230,6 +239,7 @@ export default function LedgersPage() {
 
       <PaymentFormDialog open={payOpen} onOpenChange={setPayOpen} mode="VENDOR_PAYMENT" presetPartyId={vendorId || undefined} />
       <PaymentFormDialog open={receiptOpen} onOpenChange={setReceiptOpen} mode="DEALER_RECEIPT" presetPartyId={dealerId || undefined} />
+      <AdjustBalanceDialog target={adjust} onClose={() => setAdjust(null)} />
     </div>
   );
 }

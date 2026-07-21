@@ -100,8 +100,12 @@ export const vendorService = {
       where: { vendorId: id, type: 'VENDOR_PAYMENT' },
       select: { voucherNo: true, paymentDate: true, amount: true },
     });
+    const adjustments = await prisma.adjustment.findMany({
+      where: { vendorId: id },
+      select: { adjustmentNo: true, adjustmentDate: true, amount: true, reason: true },
+    });
 
-    type Entry = { date: Date; type: 'PURCHASE' | 'RETURN' | 'PAYMENT'; reference: string | null; amount: number; balance: number };
+    type Entry = { date: Date; type: 'PURCHASE' | 'RETURN' | 'PAYMENT' | 'ADJUSTMENT'; reference: string | null; amount: number; balance: number };
     const raw: Omit<Entry, 'balance'>[] = [
       ...purchases.map((p) => ({ date: p.purchaseDate, type: 'PURCHASE' as const, reference: p.purchaseNo, amount: p.totalAmount })),
       // Amount paid at the time of purchase reduces what we owe.
@@ -110,6 +114,7 @@ export const vendorService = {
         .map((p) => ({ date: p.purchaseDate, type: 'PAYMENT' as const, reference: `${p.purchaseNo} (paid)`, amount: -p.paidAmount })),
       ...returns.map((r) => ({ date: r.returnDate, type: 'RETURN' as const, reference: r.returnNo, amount: -r.totalAmount })),
       ...payments.map((pm) => ({ date: pm.paymentDate, type: 'PAYMENT' as const, reference: pm.voucherNo, amount: -pm.amount })),
+      ...adjustments.map((a) => ({ date: a.adjustmentDate, type: 'ADJUSTMENT' as const, reference: a.reason || a.adjustmentNo, amount: a.amount })),
     ];
     raw.sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -120,5 +125,23 @@ export const vendorService = {
     });
 
     return { vendor, openingBalance: vendor.openingBalance, entries };
+  },
+
+  // Manual outstanding balance adjustment (+ increases what we owe, - decreases).
+  async adjust(id: string, amount: number, reason: string) {
+    const vendor = await this.get(id);
+    if (!amount || amount === 0) throw ApiError.badRequest('Adjustment amount cannot be zero');
+    if (!reason?.trim()) throw ApiError.badRequest('A reason is required');
+    return prisma.$transaction(async (tx) => {
+      const created = await tx.adjustment.create({
+        data: { vendorId: vendor.id, amount, reason: reason.trim() },
+      });
+      const withNo = await tx.adjustment.update({
+        where: { id: created.id },
+        data: { adjustmentNo: `ADJ-${String(created.codeNo).padStart(5, '0')}` },
+      });
+      await tx.vendor.update({ where: { id: vendor.id }, data: { balance: { increment: amount } } });
+      return withNo;
+    });
   },
 };

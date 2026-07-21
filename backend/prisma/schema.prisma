@@ -44,6 +44,7 @@ model User {
   refreshTokens RefreshToken[]
   loginHistory  LoginHistory[]
   auditLogs     AuditLog[]
+  salaries      Salary[]
 
   @@map("users")
 }
@@ -222,9 +223,10 @@ model Vendor {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  purchases Purchase[]
-  returns   PurchaseReturn[]
-  payments  Payment[]
+  purchases   Purchase[]
+  returns     PurchaseReturn[]
+  payments    Payment[]
+  adjustments Adjustment[]
 
   @@map("vendors")
 }
@@ -454,8 +456,9 @@ model Dealer {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  sales    Sale[]
-  payments Payment[]
+  sales       Sale[]
+  payments    Payment[]
+  adjustments Adjustment[]
 
   @@map("dealers")
 }
@@ -522,6 +525,69 @@ model Dispatch {
 
   @@index([saleId])
   @@map("dispatches")
+}
+
+// ─────────────────────────────────────────────────────────
+// PHASE 12 — Godown Expenses, Salaries & Financial Reports
+// ─────────────────────────────────────────────────────────
+
+model Expense {
+  id          String        @id @default(uuid())
+  codeNo      Int           @unique @default(autoincrement()) @map("code_no")
+  expenseNo   String?       @unique @map("expense_no")
+  category    String
+  amount      Float
+  expenseDate DateTime      @default(now()) @map("expense_date")
+  method      PaymentMethod @default(CASH)
+  description String?
+  notes       String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([category])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+model Salary {
+  id           String        @id @default(uuid())
+  codeNo       Int           @unique @default(autoincrement()) @map("code_no")
+  salaryNo     String?       @unique @map("salary_no")
+  employeeName String        @map("employee_name")
+  userId       String?       @map("user_id")
+  user         User?         @relation(fields: [userId], references: [id])
+  month        String // "YYYY-MM"
+  amount       Float
+  paidAmount   Float         @default(0) @map("paid_amount")
+  paymentDate  DateTime?     @map("payment_date")
+  method       PaymentMethod @default(CASH)
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([month])
+  @@map("salaries")
+}
+
+// ─────────────────────────────────────────────────────────
+// PHASE 13 — Manual balance adjustments
+// ─────────────────────────────────────────────────────────
+
+model Adjustment {
+  id             String   @id @default(uuid())
+  codeNo         Int      @unique @default(autoincrement()) @map("code_no")
+  adjustmentNo   String?  @unique @map("adjustment_no")
+  dealerId       String?  @map("dealer_id")
+  dealer         Dealer?  @relation(fields: [dealerId], references: [id])
+  vendorId       String?  @map("vendor_id")
+  vendor         Vendor?  @relation(fields: [vendorId], references: [id])
+  amount         Float // signed: + increases outstanding, - decreases
+  reason         String
+  adjustmentDate DateTime @default(now()) @map("adjustment_date")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([dealerId])
+  @@index([vendorId])
+  @@map("adjustments")
 }
 
 // Single-row company/application settings.

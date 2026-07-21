@@ -60,6 +60,25 @@ export const dispatchService = {
     });
   },
 
+  async update(id: string, input: DispatchInput) {
+    const existing = await dispatchRepository.findById(id);
+    if (!existing) throw ApiError.notFound('Dispatch not found');
+    const sale = await prisma.sale.findUnique({ where: { id: input.saleId } });
+    if (!sale) throw ApiError.notFound('Sale invoice not found');
+    return prisma.dispatch.update({
+      where: { id },
+      data: {
+        saleId: input.saleId,
+        biltyNumber: input.biltyNumber.trim(),
+        transporterName: input.transporterName.trim(),
+        city: input.city.trim(),
+        dispatchDate: input.dispatchDate ?? existing.dispatchDate,
+        notes: clean(input.notes),
+      },
+      include: { sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true } } } } },
+    });
+  },
+
   async remove(id: string) {
     const dispatch = await dispatchRepository.findById(id);
     if (!dispatch) throw ApiError.notFound('Dispatch not found');

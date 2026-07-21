@@ -1,273 +1,165 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
+  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis,
 } from 'recharts';
 import {
-  AlertTriangle,
-  ArrowRight,
-  Boxes,
-  CircleDollarSign,
-  FileSpreadsheet,
-  FileText,
-  LayoutDashboard,
-  Package,
-  PackageX,
-  Plus,
-  ReceiptText,
-  ShoppingCart,
-  TrendingUp,
-  Wallet,
+  AlertTriangle, ArrowRight, Boxes, LayoutDashboard, Package, PackageX, Plus,
+  ReceiptText, ShoppingCart, TrendingDown, TrendingUp, Wallet, FileSpreadsheet, PieChart,
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatCard } from '@/components/common/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-import { timeAgo } from '@/utils/formatters';
-
-/* ---- Placeholder data (Phase 1 is UI only) ---- */
-
-const stats = [
-  { label: 'Total Products', value: '—', icon: Package, tone: 'primary' as const, hint: 'Awaiting catalogue' },
-  { label: 'Total Stock', value: '—', icon: Boxes, tone: 'info' as const, hint: 'Units in godown' },
-  { label: "Today's Sales", value: '—', icon: ReceiptText, tone: 'success' as const, hint: 'Billed today' },
-  { label: 'Monthly Sales', value: '—', icon: TrendingUp, tone: 'success' as const, hint: 'This month' },
-  { label: 'Pending Payments', value: '—', icon: Wallet, tone: 'warning' as const, hint: 'Receivables' },
-  { label: 'Low Stock', value: '—', icon: AlertTriangle, tone: 'warning' as const, hint: 'Below reorder level' },
-  { label: 'Out Of Stock', value: '—', icon: PackageX, tone: 'danger' as const, hint: 'Needs restock' },
-];
-
-const salesTrend = [
-  { name: 'Mon', value: 0 },
-  { name: 'Tue', value: 0 },
-  { name: 'Wed', value: 0 },
-  { name: 'Thu', value: 0 },
-  { name: 'Fri', value: 0 },
-  { name: 'Sat', value: 0 },
-  { name: 'Sun', value: 0 },
-];
-
-const topCategories = [
-  { name: 'Engine', value: 0 },
-  { name: 'Brakes', value: 0 },
-  { name: 'Electrical', value: 0 },
-  { name: 'Body', value: 0 },
-  { name: 'Tyres', value: 0 },
-];
-
-const stockSplit = [
-  { name: 'In Stock', value: 1 },
-  { name: 'Low Stock', value: 0 },
-  { name: 'Out of Stock', value: 0 },
-];
-const pieColors = ['hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))'];
+import { dashboardApi } from '@/services/dashboard.service';
+import { settingsService } from '@/services/settings.service';
+import { formatCurrency, formatDate } from '@/utils/formatters';
+import { cn } from '@/lib/utils';
 
 const quickActions = [
   { label: 'Add Product', icon: Plus, to: '/products' },
   { label: 'Purchase', icon: ShoppingCart, to: '/purchases' },
-  { label: 'Sales', icon: ReceiptText, to: '/sales' },
-  { label: 'Generate Invoice', icon: FileText, to: '/sales' },
-  { label: 'Export Excel', icon: FileSpreadsheet, to: '/reports' },
+  { label: 'New Sale', icon: ReceiptText, to: '/sales' },
+  { label: 'Reports', icon: FileSpreadsheet, to: '/reports' },
 ];
-
-const recentActivity = [
-  { id: '1', text: 'Welcome to SRS Godown ERP', at: Date.now() - 1000 * 60 * 2 },
-  { id: '2', text: 'Your workspace is ready to configure', at: Date.now() - 1000 * 60 * 60 },
-  { id: '3', text: 'Add your company details in Settings', at: Date.now() - 1000 * 60 * 60 * 5 },
-];
-
-function ChartEmptyBadge() {
-  return (
-    <Badge variant="secondary" className="font-medium text-muted-foreground">
-      Sample data
-    </Badge>
-  );
-}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
+  const currency = settings?.currency ?? 'PKR';
+  const { data, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: dashboardApi.stats });
+
+  const money = (v?: number) => formatCurrency(v ?? 0, currency);
+
+  const operationalCards = data ? [
+    { label: 'Total Products', value: String(data.totalProducts), icon: Package, tone: 'primary' as const, hint: 'In catalogue' },
+    { label: 'Total Stock', value: String(data.totalStock), icon: Boxes, tone: 'info' as const, hint: 'Units in godown' },
+    { label: "Today's Sales", value: money(data.todaySales), icon: ReceiptText, tone: 'success' as const, hint: `${data.todaySalesCount} invoice(s)` },
+    { label: 'Monthly Sales', value: money(data.monthSales), icon: TrendingUp, tone: 'success' as const, hint: 'This month' },
+    { label: 'Low Stock', value: String(data.lowStock), icon: AlertTriangle, tone: 'warning' as const, hint: 'At/below minimum' },
+    { label: 'Out Of Stock', value: String(data.outOfStock), icon: PackageX, tone: 'danger' as const, hint: 'Needs restock' },
+  ] : [];
+
+  const adminCards = data?.admin ? [
+    { label: 'Receivable', value: money(data.receivable), icon: Wallet, tone: 'warning' as const, hint: 'Dealers owe you' },
+    { label: 'Payable', value: money(data.payable), icon: ShoppingCart, tone: 'info' as const, hint: 'You owe vendors' },
+  ] : [];
+
   return (
     <div>
       <PageHeader
         title={`Welcome back, ${firstName}`}
-        description="Here's an overview of your warehouse. Live numbers appear once modules are enabled."
+        description="Live overview of your warehouse."
         icon={<LayoutDashboard className="h-5 w-5" />}
       />
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {stats.map((s) => (
-          <StatCard key={s.label} {...s} />
-        ))}
-      </div>
+      {isLoading || !data ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...operationalCards, ...adminCards].map((s) => <StatCard key={s.label} {...s} />)}
+          </div>
 
-      {/* Charts */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Sales Overview</CardTitle>
-            <ChartEmptyBadge />
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={salesTrend} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <RechartsTooltip
-                  contentStyle={{
-                    background: 'hsl(var(--popover))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '0.5rem',
-                    color: 'hsl(var(--popover-foreground))',
-                    fontSize: '0.8rem',
-                  }}
-                />
-                <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#salesFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Stock Status</CardTitle>
-            <ChartEmptyBadge />
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={stockSplit}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={95}
-                  paddingAngle={3}
-                  strokeWidth={0}
-                >
-                  {stockSplit.map((entry, i) => (
-                    <Cell key={entry.name} fill={pieColors[i]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip
-                  contentStyle={{
-                    background: 'hsl(var(--popover))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '0.5rem',
-                    color: 'hsl(var(--popover-foreground))',
-                    fontSize: '0.8rem',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-2 flex flex-wrap justify-center gap-4">
-              {stockSplit.map((entry, i) => (
-                <div key={entry.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: pieColors[i] }} />
-                  {entry.name}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Categories + Quick actions */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Top Categories</CardTitle>
-            <ChartEmptyBadge />
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={topCategories} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                <RechartsTooltip
-                  cursor={{ fill: 'hsl(var(--muted))' }}
-                  contentStyle={{
-                    background: 'hsl(var(--popover))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '0.5rem',
-                    color: 'hsl(var(--popover-foreground))',
-                    fontSize: '0.8rem',
-                  }}
-                />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={48} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-2.5">
-            {quickActions.map((action) => (
-              <Button
-                key={action.label}
-                variant="outline"
-                className="h-12 justify-between"
-                onClick={() => navigate(action.to)}
-              >
-                <span className="flex items-center gap-2.5">
-                  <action.icon className="h-4 w-4 text-primary" />
-                  {action.label}
-                </span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent activity */}
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {recentActivity.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-muted/50"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <CircleDollarSign className="h-4 w-4" />
-                </span>
-                <p className="flex-1 text-sm font-medium">{item.text}</p>
-                <span className="text-xs text-muted-foreground">{timeAgo(item.at)}</span>
+          {/* Admin financial banner */}
+          {data.admin && (
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Purchases (month)</p><p className="mt-1 text-lg font-bold">{money(data.monthPurchases)}</p></div>
+              <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Expenses (month)</p><p className="mt-1 text-lg font-bold">{money(data.monthExpenses)}</p></div>
+              <div className="rounded-lg border border-border bg-card p-4"><p className="text-sm text-muted-foreground">Salaries (month)</p><p className="mt-1 text-lg font-bold">{money(data.monthSalaries)}</p></div>
+              <div className={cn('rounded-lg border p-4', (data.netProfitMonth ?? 0) >= 0 ? 'border-success/30 bg-success/5' : 'border-destructive/30 bg-destructive/5')}>
+                <p className="flex items-center gap-1 text-sm text-muted-foreground">{(data.netProfitMonth ?? 0) >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />} Net Profit (month)</p>
+                <p className={cn('mt-1 text-lg font-bold', (data.netProfitMonth ?? 0) >= 0 ? 'text-success' : 'text-destructive')}>{money(data.netProfitMonth)}</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+          )}
+
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Sales trend */}
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle className="text-base">Sales — last 7 days</CardTitle></CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data.salesTrend} margin={{ left: -12, right: 8, top: 8 }}>
+                      <defs>
+                        <linearGradient id="sales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <RechartsTooltip formatter={(v: number) => money(v)} contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} />
+                      <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#sales)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick actions + activity */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-2">
+                  {quickActions.map((a) => (
+                    <Button key={a.label} variant="outline" className="justify-start" onClick={() => navigate(a.to)}>
+                      <a.icon className="h-4 w-4" />{a.label}
+                    </Button>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {data.admin && (
+                <Card>
+                  <CardHeader className="flex-row items-center justify-between">
+                    <CardTitle className="text-base">Pending to collect</CardTitle>
+                    <PieChart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-2xl font-bold text-warning">{money(data.pendingReceivable)}</p>
+                    <Button variant="ghost" size="sm" className="mt-1 px-0 text-primary" onClick={() => navigate('/pending-ledger')}>
+                      View pending ledger <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+
+          {/* Recent sales (admin) */}
+          {data.admin && data.recentSales && data.recentSales.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader><CardTitle className="text-base">Recent sales</CardTitle></CardHeader>
+              <CardContent>
+                <div className="divide-y divide-border">
+                  {data.recentSales.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between py-2.5 text-sm">
+                      <div>
+                        <span className="font-medium">{r.no}</span>
+                        <span className="ml-2 text-muted-foreground">{r.party}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted-foreground">{formatDate(r.date)}</span>
+                        <span className="font-semibold">{money(r.amount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

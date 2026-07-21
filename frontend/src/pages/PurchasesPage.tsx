@@ -45,7 +45,7 @@ import { PurchaseReturnDialog } from '@/components/purchases/PurchaseReturnDialo
 import { purchasesApi, type PurchaseQuery } from '@/services/purchases.service';
 import { vendorsApi } from '@/services/vendors.service';
 import { settingsService } from '@/services/settings.service';
-import { exportPurchasesExcel } from '@/utils/purchaseDocs';
+import { exportPurchasesReport } from '@/utils/reportExports';
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
 import { cn } from '@/lib/utils';
@@ -69,6 +69,7 @@ export default function PurchasesPage() {
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: settingsService.get, retry: false });
   const currency = settings?.currency ?? 'PKR';
+  const meta = { companyName: settings?.companyName || 'SRS Traders', logoUrl: settings?.companyLogo, currency };
   const { data: vendors } = useQuery({ queryKey: ['vendors'], queryFn: () => vendorsApi.list() });
 
   /* Purchases tab state */
@@ -149,7 +150,7 @@ export default function PurchasesPage() {
     try {
       const all = await purchasesApi.list({ ...query, page: 1, limit: 100000 });
       if (all.items.length === 0) return toast.error('Nothing to export');
-      exportPurchasesExcel(all.items);
+      await exportPurchasesReport(all.items, meta);
       toast.success('Exported', `${all.items.length} purchases exported.`);
     } catch (err) {
       toast.error('Export failed', err instanceof Error ? err.message : 'Try again.');

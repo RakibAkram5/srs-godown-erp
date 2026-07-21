@@ -11,6 +11,11 @@ import {
   BarChart3,
   Settings,
   Users,
+  Wallet,
+  Banknote,
+  PieChart,
+  ArrowLeftRight,
+  AlertCircle,
   type LucideIcon,
 } from 'lucide-react';
 import type { User } from '@/types';
@@ -37,7 +42,12 @@ export const navItems: NavItem[] = [
   { title: 'Dealers', path: '/dealers', icon: Store, module: 'dealers' },
   { title: 'Vendors', path: '/vendors', icon: Truck, module: 'vendors' },
   { title: 'Ledgers', path: '/ledgers', icon: BookOpen, adminOnly: true },
+  { title: 'Payments', path: '/payments', icon: ArrowLeftRight, adminOnly: true },
+  { title: 'Pending Ledger', path: '/pending-ledger', icon: AlertCircle, adminOnly: true },
   { title: 'Reports', path: '/reports', icon: BarChart3, adminOnly: true },
+  { title: 'Expenses', path: '/expenses', icon: Wallet, adminOnly: true },
+  { title: 'Salaries', path: '/salaries', icon: Banknote, adminOnly: true },
+  { title: 'Financial', path: '/financial', icon: PieChart, adminOnly: true },
   { title: 'Users', path: '/users', icon: Users, adminOnly: true },
   { title: 'Settings', path: '/settings', icon: Settings, adminOnly: true },
 ];

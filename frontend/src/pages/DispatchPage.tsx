@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus, Send, Trash2 } from 'lucide-react';
+import { Download, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SearchBar } from '@/components/common/SearchBar';
 import { Pagination } from '@/components/common/Pagination';
@@ -31,6 +31,7 @@ export default function DispatchPage() {
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Dispatch | null>(null);
   const [deleting, setDeleting] = useState<Dispatch | null>(null);
 
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function DispatchPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4" />Export</Button>
-            <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New Dispatch</Button>
+            <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />New Dispatch</Button>
           </div>
         }
       />
@@ -91,7 +92,7 @@ export default function DispatchPage() {
           icon={Send}
           title="No dispatches yet"
           description="Record a dispatch to keep a transport log for your sale invoices."
-          action={<Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New Dispatch</Button>}
+          action={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />New Dispatch</Button>}
         />
       ) : (
         <div className="rounded-lg border border-border">
@@ -118,9 +119,14 @@ export default function DispatchPage() {
                     <TableCell className="text-muted-foreground">{d.transporterName}</TableCell>
                     <TableCell>{d.city}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(d)} aria-label="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setEditing(d); setFormOpen(true); }} aria-label="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleting(d)} aria-label="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -137,7 +143,7 @@ export default function DispatchPage() {
         </div>
       )}
 
-      <DispatchFormDialog open={formOpen} onOpenChange={setFormOpen} />
+      <DispatchFormDialog open={formOpen} onOpenChange={setFormOpen} editing={editing} />
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(v) => !v && setDeleting(null)}

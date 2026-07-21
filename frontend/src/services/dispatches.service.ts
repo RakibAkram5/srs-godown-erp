@@ -27,6 +27,9 @@ export const dispatchesApi = {
   create(payload: DispatchPayload): Promise<Dispatch> {
     return unwrap<Dispatch>(api.post('/dispatches', payload));
   },
+  update(id: string, payload: DispatchPayload): Promise<Dispatch> {
+    return unwrap<Dispatch>(api.put(`/dispatches/${id}`, payload));
+  },
   remove(id: string): Promise<null> {
     return unwrap<null>(api.delete(`/dispatches/${id}`));
   },

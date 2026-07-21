@@ -26,6 +26,9 @@ export const vendorsApi = {
   ledger(id: string): Promise<VendorLedger> {
     return unwrap<VendorLedger>(api.get(`/vendors/${id}/ledger`));
   },
+  adjust(id: string, amount: number, reason: string): Promise<unknown> {
+    return unwrap(api.post(`/vendors/${id}/adjust`, { amount, reason }));
+  },
   create(payload: VendorPayload): Promise<Vendor> {
     return unwrap<Vendor>(api.post('/vendors', payload));
   },

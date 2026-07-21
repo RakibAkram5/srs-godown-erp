@@ -12,6 +12,10 @@ import dealerRoutes from './dealer.routes';
 import paymentRoutes from './payment.routes';
 import dispatchRoutes from './dispatch.routes';
 import userRoutes from './user.routes';
+import expenseRoutes from './expense.routes';
+import salaryRoutes from './salary.routes';
+import reportRoutes from './report.routes';
+import dashboardRoutes from './dashboard.routes';
 
 const router = Router();
 
@@ -30,5 +34,9 @@ router.use('/dealers', gate('dealers'), dealerRoutes);
 router.use('/payments', paymentRoutes); // admin-only (enforced inside)
 router.use('/dispatches', gate('dispatch'), dispatchRoutes);
 router.use('/users', userRoutes); // admin-only (enforced inside)
+router.use('/expenses', expenseRoutes); // admin-only
+router.use('/salaries', salaryRoutes); // admin-only
+router.use('/reports', reportRoutes); // admin-only
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

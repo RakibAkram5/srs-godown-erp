@@ -1,9 +1,26 @@
-# SRS Godown ERP — Phase 11 (Auth, RBAC & User Management)
+# SRS Godown ERP — Phase 13 (Adjustments, Pending Ledger, Payments & Pro Excel)
 
 A modern, fast and beginner-friendly ERP for a **bike spare parts warehouse**.
 
 **Phase 2** adds a complete, production-ready **Authentication & User Management** system on top of
 the Phase 1 foundation, without changing the existing structure, layout, theme or design.
+
+**What's new in Phase 13 — the final build**
+
+- **Live dashboard**: real numbers now — products, total stock, low/out-of-stock, today's & monthly sales, a 7-day sales chart, and (Admin) receivable/payable, month purchases/expenses/salaries, **net profit**, pending-to-collect and recent sales.
+
+- **Manual balance adjustment** (Admin): correct a dealer/vendor outstanding balance up or down with a reason, recorded straight into the ledger (Debit/Credit).
+- **Dedicated Pending Ledger** (Admin): all **unpaid & partially-paid** sales and purchases, filter by party, date, bill no and status, with total-to-collect / total-to-pay and Excel export.
+- **Payments management** (Admin): a full list of every vendor payment and dealer receipt with **edit and delete** — balances, ledgers and pending update automatically.
+- **Dispatch edit**: dispatch records are now add / view / **edit** / delete.
+- **Professional Excel** across every report (Sales, Purchases, Dealer/Vendor Ledger, Pending Ledger, Payments, Expenses, Salaries, Financial): company name & **logo**, report title, generated timestamp, applied filters, **bold bordered header**, currency formatting, **auto column width**, **totals row** and a print-ready landscape layout.
+
+**What's new in Phase 12 — Expenses, Salaries & Financial Reports**
+
+- **Godown Expenses** (Admin): warehouse costs (rent, electricity, utilities, maintenance, equipment, etc.) with add/edit/delete, category & date filters, running total and Excel export.
+- **Salary Management** (Admin): monthly employee salaries with paid/remaining, status, month filter, payment history and Excel export.
+- **Financial Reports** (Admin): a **Profit & Loss** statement for any **Annual / Quarterly / custom** period — Sales, Purchases, Expenses, Salaries, **Net Profit**, plus outstanding balances, pending value and expenses-by-category, with Excel export.
+- All expenses and salaries flow into the P&L automatically.
 
 **What's new in Phase 11 — Auth, RBAC & User Management**
 
@@ -286,6 +303,25 @@ npm run dev                   # starts http://localhost:5000
 > The **Users** menu (Admin only) lets you create Managers/Employees and tick which modules they can use.
 > Financial data (ledgers, reports, pending, outstanding, settings) stays admin-only and is hidden from others.
 
+> **Adding Phase 12 (Expenses/Salaries/Financial)?** It adds `expenses` and `salaries` tables — no reset:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> New Admin-only menus: **Expenses**, **Salaries** and **Financial** (Profit & Loss, annual/quarterly).
+
+> **Adding Phase 13 (final)?** It adds the `adjustments` table — no reset:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> New Admin-only menus: **Payments** (edit/delete) and **Pending Ledger** (unpaid invoices).
+> Ledgers now have an **Adjust** button, and every report exports as a **professionally formatted Excel** file.
+
 Health check: **GET** `http://localhost:5000/api/health`
 
 ### 2. Frontend
@@ -358,6 +394,9 @@ Phase 2 defines these tables:
 - **`dispatches`** — transport records (bilty, transporter, city) linked to sale invoices
 - **`dealers.city`** — dealer's city, used for search/filter
 - **`users.role`** (Admin/Manager/Employee) & **`users.permissions`** — module access control
+- **`expenses`** — warehouse/godown expenses (feeds the P&L)
+- **`salaries`** — monthly employee salary records with payment status
+- **`adjustments`** — manual dealer/vendor balance corrections (feed the ledgers)
 - **`settings`** — company name, logo, phone, address, currency, language, theme, timestamps
 
 No inventory/business tables exist yet — that's by design for this phase.

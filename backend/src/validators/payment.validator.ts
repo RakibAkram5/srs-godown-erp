@@ -14,4 +14,14 @@ const paymentBody = z.object({
 
 export const createPaymentSchema = z.object({ body: paymentBody });
 
+export const updatePaymentSchema = z.object({
+  body: z.object({
+    amount: z.coerce.number().positive('Amount must be greater than 0'),
+    method: z.enum(['CASH', 'BANK', 'CARD', 'CHEQUE', 'OTHER']).default('CASH'),
+    paymentDate: z.coerce.date().optional(),
+    notes: optionalString,
+  }),
+});
+export type PaymentUpdateInput = z.infer<typeof updatePaymentSchema>['body'];
+
 export type PaymentInput = z.infer<typeof paymentBody>;

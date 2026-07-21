@@ -14,6 +14,9 @@ export const dealerController = {
   ledger: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await dealerService.ledger(req.params.id));
   }),
+  adjust: asyncHandler(async (req: Request, res: Response) => {
+    return sendSuccess(res, await dealerService.adjust(req.params.id, Number(req.body.amount), req.body.reason), 'Balance adjusted');
+  }),
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await dealerService.create(req.body), 'Dealer created', 201);
   }),

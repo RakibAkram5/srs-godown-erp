@@ -15,15 +15,17 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { salesApi } from '@/services/sales.service';
 import { dispatchesApi, type DispatchPayload } from '@/services/dispatches.service';
+import type { Dispatch } from '@/types';
 import { toast } from '@/utils/toast';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   presetSaleId?: string;
+  editing?: Dispatch | null;
 }
 
-export function DispatchFormDialog({ open, onOpenChange, presetSaleId }: Props) {
+export function DispatchFormDialog({ open, onOpenChange, presetSaleId, editing }: Props) {
   const queryClient = useQueryClient();
   const [saleId, setSaleId] = useState('');
   const [biltyNumber, setBiltyNumber] = useState('');
@@ -40,21 +42,27 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId }: Props) 
 
   useEffect(() => {
     if (open) {
-      setSaleId(presetSaleId ?? '');
-      setBiltyNumber(''); setTransporterName(''); setCity('');
-      setDate(new Date().toISOString().slice(0, 10));
-      setNotes('');
+      if (editing) {
+        setSaleId(editing.saleId);
+        setBiltyNumber(editing.biltyNumber); setTransporterName(editing.transporterName); setCity(editing.city);
+        setDate(editing.dispatchDate.slice(0, 10)); setNotes(editing.notes ?? '');
+      } else {
+        setSaleId(presetSaleId ?? '');
+        setBiltyNumber(''); setTransporterName(''); setCity('');
+        setDate(new Date().toISOString().slice(0, 10));
+        setNotes('');
+      }
     }
-  }, [open, presetSaleId]);
+  }, [open, presetSaleId, editing]);
 
   const mutation = useMutation({
     mutationFn: () => {
       const payload: DispatchPayload = { saleId, biltyNumber, transporterName, city, dispatchDate: date, notes: notes || null };
-      return dispatchesApi.create(payload);
+      return editing ? dispatchesApi.update(editing.id, payload) : dispatchesApi.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dispatches'] });
-      toast.success('Dispatch recorded');
+      toast.success(editing ? 'Dispatch updated' : 'Dispatch recorded');
       onOpenChange(false);
     },
     onError: (err: Error) => toast.error('Could not save dispatch', err.message),
@@ -72,14 +80,14 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId }: Props) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Record dispatch</DialogTitle>
+          <DialogTitle>{editing ? 'Edit dispatch' : 'Record dispatch'}</DialogTitle>
           <DialogDescription>Link a bilty to a sale invoice for your transport record.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="sale">Sale invoice</Label>
-            <Select id="sale" value={saleId} onChange={(e) => setSaleId(e.target.value)} disabled={!!presetSaleId}>
+            <Select id="sale" value={saleId} onChange={(e) => setSaleId(e.target.value)} disabled={!!presetSaleId && !editing}>
               <option value="">— Select invoice —</option>
               {(sales?.items ?? []).map((s) => (
                 <option key={s.id} value={s.id}>{s.saleNo} — {s.dealer?.name || s.customerName || 'Walk-in'}</option>
@@ -114,7 +122,7 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId }: Props) 
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button loading={mutation.isPending} onClick={submit}>Record dispatch</Button>
+          <Button loading={mutation.isPending} onClick={submit}>{editing ? 'Save changes' : 'Record dispatch'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

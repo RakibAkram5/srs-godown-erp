@@ -93,6 +93,30 @@ export const paymentService = {
     });
   },
 
+  async update(id: string, input: { amount: number; method: 'CASH' | 'BANK' | 'CARD' | 'CHEQUE' | 'OTHER'; paymentDate?: Date; notes?: string | null }) {
+    const payment = await paymentRepository.findById(id);
+    if (!payment) throw ApiError.notFound('Payment not found');
+    const delta = input.amount - payment.amount; // extra paid reduces balance further
+    return prisma.$transaction(async (tx) => {
+      if (payment.type === 'VENDOR_PAYMENT' && payment.vendorId) {
+        await tx.vendor.update({ where: { id: payment.vendorId }, data: { balance: { decrement: delta } } });
+      }
+      if (payment.type === 'DEALER_RECEIPT' && payment.dealerId) {
+        await tx.dealer.update({ where: { id: payment.dealerId }, data: { balance: { decrement: delta } } });
+      }
+      return tx.payment.update({
+        where: { id },
+        data: {
+          amount: input.amount,
+          method: input.method,
+          paymentDate: input.paymentDate ?? payment.paymentDate,
+          notes: (input.notes ?? '').toString().trim() || null,
+        },
+        include: { vendor: { select: { id: true, name: true } }, dealer: { select: { id: true, name: true } } },
+      });
+    });
+  },
+
   async remove(id: string) {
     const payment = await paymentRepository.findById(id);
     if (!payment) throw ApiError.notFound('Payment not found');

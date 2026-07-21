@@ -30,6 +30,9 @@ export const paymentsApi = {
   create(payload: PaymentPayload): Promise<Payment> {
     return unwrap<Payment>(api.post('/payments', payload));
   },
+  update(id: string, payload: { amount: number; method?: string; paymentDate?: string; notes?: string | null }): Promise<Payment> {
+    return unwrap<Payment>(api.put(`/payments/${id}`, payload));
+  },
   remove(id: string): Promise<null> {
     return unwrap<null>(api.delete(`/payments/${id}`));
   },

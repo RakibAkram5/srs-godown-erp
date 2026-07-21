@@ -90,8 +90,12 @@ export const dealerService = {
       where: { dealerId: id, type: 'DEALER_RECEIPT' },
       select: { voucherNo: true, paymentDate: true, amount: true },
     });
+    const adjustments = await prisma.adjustment.findMany({
+      where: { dealerId: id },
+      select: { adjustmentNo: true, adjustmentDate: true, amount: true, reason: true },
+    });
 
-    type Entry = { date: Date; type: 'SALE' | 'RETURN' | 'RECEIPT'; reference: string | null; amount: number; balance: number };
+    type Entry = { date: Date; type: 'SALE' | 'RETURN' | 'RECEIPT' | 'ADJUSTMENT'; reference: string | null; amount: number; balance: number };
     const raw: Omit<Entry, 'balance'>[] = [
       ...sales.map((s) => ({ date: s.saleDate, type: 'SALE' as const, reference: s.saleNo, amount: s.totalAmount })),
       // Amount paid at the time of sale is a receipt against the balance.
@@ -100,6 +104,7 @@ export const dealerService = {
         .map((s) => ({ date: s.saleDate, type: 'RECEIPT' as const, reference: `${s.saleNo} (paid)`, amount: -s.paidAmount })),
       ...returns.map((r) => ({ date: r.returnDate, type: 'RETURN' as const, reference: r.returnNo, amount: -r.totalAmount })),
       ...receipts.map((rc) => ({ date: rc.paymentDate, type: 'RECEIPT' as const, reference: rc.voucherNo, amount: -rc.amount })),
+      ...adjustments.map((a) => ({ date: a.adjustmentDate, type: 'ADJUSTMENT' as const, reference: a.reason || a.adjustmentNo, amount: a.amount })),
     ];
     raw.sort((a, b) => a.date.getTime() - b.date.getTime());
 
@@ -110,5 +115,23 @@ export const dealerService = {
     });
 
     return { dealer, openingBalance: dealer.openingBalance, entries };
+  },
+
+  // Manual outstanding balance adjustment (+ increases, - decreases).
+  async adjust(id: string, amount: number, reason: string) {
+    const dealer = await this.get(id);
+    if (!amount || amount === 0) throw ApiError.badRequest('Adjustment amount cannot be zero');
+    if (!reason?.trim()) throw ApiError.badRequest('A reason is required');
+    return prisma.$transaction(async (tx) => {
+      const created = await tx.adjustment.create({
+        data: { dealerId: dealer.id, amount, reason: reason.trim() },
+      });
+      const withNo = await tx.adjustment.update({
+        where: { id: created.id },
+        data: { adjustmentNo: `ADJ-${String(created.codeNo).padStart(5, '0')}` },
+      });
+      await tx.dealer.update({ where: { id: dealer.id }, data: { balance: { increment: amount } } });
+      return withNo;
+    });
   },
 };

@@ -11,6 +11,9 @@ export const paymentController = {
     const label = req.body.type === 'DEALER_RECEIPT' ? 'Receipt recorded' : 'Payment recorded';
     return sendSuccess(res, await paymentService.create(req.body), label, 201);
   }),
+  update: asyncHandler(async (req: Request, res: Response) => {
+    return sendSuccess(res, await paymentService.update(req.params.id, req.body), 'Payment updated');
+  }),
   remove: asyncHandler(async (req: Request, res: Response) => {
     await paymentService.remove(req.params.id);
     return sendSuccess(res, null, 'Entry deleted');

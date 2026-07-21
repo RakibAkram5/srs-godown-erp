@@ -24,6 +24,9 @@ export const dealersApi = {
   ledger(id: string): Promise<DealerLedger> {
     return unwrap<DealerLedger>(api.get(`/dealers/${id}/ledger`));
   },
+  adjust(id: string, amount: number, reason: string): Promise<unknown> {
+    return unwrap(api.post(`/dealers/${id}/adjust`, { amount, reason }));
+  },
   create(payload: DealerPayload): Promise<Dealer> {
     return unwrap<Dealer>(api.post('/dealers', payload));
   },

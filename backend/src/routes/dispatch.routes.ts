@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.get('/', dispatchController.list);
 router.post('/', validate(createDispatchSchema), dispatchController.create);
+router.put('/:id', validate(createDispatchSchema), dispatchController.update);
 router.delete('/:id', dispatchController.remove);
 
 export default router;
