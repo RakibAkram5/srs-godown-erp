@@ -22,3 +22,6 @@ npm-debug.log*
 
 # Prisma
 prisma/migrations/dev.db*
+
+# TypeScript incremental build info
+*.tsbuildinfo
