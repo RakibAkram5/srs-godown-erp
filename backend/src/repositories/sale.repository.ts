@@ -15,6 +15,9 @@ export const saleRepository = {
     return prisma.sale.count({ where });
   },
   findById(id: string) {
-    return prisma.sale.findUnique({ where: { id }, include: { items: true, dealer: { select: { id: true, name: true, city: true, phone: true } } } });
+    return prisma.sale.findUnique({
+      where: { id },
+      include: { items: true, dealer: { select: { id: true, name: true, city: true, phone: true, balance: true } } },
+    });
   },
 };

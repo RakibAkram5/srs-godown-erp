@@ -15,8 +15,6 @@ const purchaseBody = z.object({
   rack: z.string().trim().optional().or(z.literal('')).nullable(),
   shelf: z.string().trim().optional().or(z.literal('')).nullable(),
   discount: z.coerce.number().min(0).default(0),
-  taxType: z.enum(['NONE', 'PERCENT', 'FIXED']).default('NONE'),
-  taxValue: z.coerce.number().min(0).default(0),
   paidAmount: z.coerce.number().min(0).default(0),
   notes: z.string().trim().optional().or(z.literal('')).nullable(),
   status: z.enum(['DRAFT', 'COMPLETED']).default('DRAFT'),

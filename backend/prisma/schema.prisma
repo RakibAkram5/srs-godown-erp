@@ -191,12 +191,6 @@ model Product {
 // stays untouched. Vendor/Purchase/Return relate to each other.
 // ─────────────────────────────────────────────────────────
 
-enum TaxType {
-  NONE
-  PERCENT
-  FIXED
-}
-
 enum PurchaseStatus {
   DRAFT
   COMPLETED
@@ -232,10 +226,10 @@ model Vendor {
 }
 
 model Purchase {
-  id         String         @id @default(uuid())
-  codeNo     Int            @unique @default(autoincrement()) @map("code_no")
-  purchaseNo String?        @unique @map("purchase_no")
-  purchaseDate DateTime     @default(now()) @map("purchase_date")
+  id           String   @id @default(uuid())
+  codeNo       Int      @unique @default(autoincrement()) @map("code_no")
+  purchaseNo   String?  @unique @map("purchase_no")
+  purchaseDate DateTime @default(now()) @map("purchase_date")
 
   vendorId String @map("vendor_id")
   vendor   Vendor @relation(fields: [vendorId], references: [id])
@@ -246,9 +240,6 @@ model Purchase {
 
   subTotal        Float          @default(0) @map("sub_total")
   discount        Float          @default(0)
-  taxType         TaxType        @default(NONE) @map("tax_type")
-  taxValue        Float          @default(0) @map("tax_value")
-  taxAmount       Float          @default(0) @map("tax_amount")
   totalAmount     Float          @default(0) @map("total_amount")
   paidAmount      Float          @default(0) @map("paid_amount")
   previousBalance Float          @default(0) @map("previous_balance")
@@ -267,16 +258,16 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id         String @id @default(uuid())
-  purchaseId String @map("purchase_id")
+  id         String   @id @default(uuid())
+  purchaseId String   @map("purchase_id")
   purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
 
-  productId     String  @map("product_id")
-  productName   String  @map("product_name")
+  productId     String @map("product_id")
+  productName   String @map("product_name")
   quantity      Int
-  purchasePrice Float   @map("purchase_price")
-  discount      Float   @default(0)
-  lineTotal     Float   @map("line_total")
+  purchasePrice Float  @map("purchase_price")
+  discount      Float  @default(0)
+  lineTotal     Float  @map("line_total")
 
   @@index([purchaseId])
   @@index([productId])
@@ -294,7 +285,7 @@ model PurchaseReturn {
   vendorId   String   @map("vendor_id")
   vendor     Vendor   @relation(fields: [vendorId], references: [id])
 
-  totalAmount Float  @default(0) @map("total_amount")
+  totalAmount Float   @default(0) @map("total_amount")
   notes       String?
 
   items PurchaseReturnItem[]
@@ -307,8 +298,8 @@ model PurchaseReturn {
 }
 
 model PurchaseReturnItem {
-  id       String @id @default(uuid())
-  returnId String @map("return_id")
+  id       String         @id @default(uuid())
+  returnId String         @map("return_id")
   return   PurchaseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
 
   productId   String @map("product_id")
@@ -322,17 +313,17 @@ model PurchaseReturnItem {
 }
 
 model StockMovement {
-  id          String            @id @default(uuid())
-  productId   String            @map("product_id")
-  productName String            @map("product_name")
-  type        StockMovementType
-  quantity    Int // signed: + inward, - outward
-  balanceAfter Int              @map("balance_after")
-  referenceType String?         @map("reference_type")
-  referenceId   String?         @map("reference_id")
-  referenceNo   String?         @map("reference_no")
+  id            String            @id @default(uuid())
+  productId     String            @map("product_id")
+  productName   String            @map("product_name")
+  type          StockMovementType
+  quantity      Int // signed: + inward, - outward
+  balanceAfter  Int               @map("balance_after")
+  referenceType String?           @map("reference_type")
+  referenceId   String?           @map("reference_id")
+  referenceNo   String?           @map("reference_no")
   note          String?
-  createdAt   DateTime          @default(now()) @map("created_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
 
   @@index([productId])
   @@index([createdAt])
@@ -351,10 +342,10 @@ enum SaleStatus {
 }
 
 model Sale {
-  id       String     @id @default(uuid())
-  codeNo   Int        @unique @default(autoincrement()) @map("code_no")
-  saleNo   String?    @unique @map("sale_no")
-  saleDate DateTime   @default(now()) @map("sale_date")
+  id       String   @id @default(uuid())
+  codeNo   Int      @unique @default(autoincrement()) @map("code_no")
+  saleNo   String?  @unique @map("sale_no")
+  saleDate DateTime @default(now()) @map("sale_date")
 
   customerName  String? @map("customer_name")
   customerPhone String? @map("customer_phone")
@@ -362,11 +353,8 @@ model Sale {
   dealerId String? @map("dealer_id")
   dealer   Dealer? @relation(fields: [dealerId], references: [id])
 
-  subTotal    Float      @default(0) @map("sub_total")
-  discount    Float      @default(0)
-  taxType     TaxType    @default(NONE) @map("tax_type")
-  taxValue    Float      @default(0) @map("tax_value")
-  taxAmount       Float      @default(0) @map("tax_amount")
+  subTotal        Float      @default(0) @map("sub_total")
+  discount        Float      @default(0)
   totalAmount     Float      @default(0) @map("total_amount")
   paidAmount      Float      @default(0) @map("paid_amount")
   previousBalance Float      @default(0) @map("previous_balance")
@@ -508,9 +496,9 @@ model Payment {
 // ─────────────────────────────────────────────────────────
 
 model Dispatch {
-  id         String   @id @default(uuid())
-  codeNo     Int      @unique @default(autoincrement()) @map("code_no")
-  dispatchNo String?  @unique @map("dispatch_no")
+  id         String  @id @default(uuid())
+  codeNo     Int     @unique @default(autoincrement()) @map("code_no")
+  dispatchNo String? @unique @map("dispatch_no")
 
   saleId String @map("sale_id")
   sale   Sale   @relation(fields: [saleId], references: [id])
@@ -594,7 +582,7 @@ model Adjustment {
 model Settings {
   id          String   @id @default(uuid())
   companyName String   @default("SRS Godown ERP") @map("company_name")
-  companyLogo String?  @map("company_logo")
+  companyLogo String?  @map("company_logo") @db.Text
   phone       String?
   address     String?
   currency    String   @default("PKR")

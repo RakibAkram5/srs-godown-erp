@@ -21,7 +21,7 @@ import { purchasesApi, type PurchasePayload } from '@/services/purchases.service
 import { settingsService } from '@/services/settings.service';
 import { formatCurrency } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
-import type { Purchase, TaxType } from '@/types';
+import type { Purchase } from '@/types';
 
 interface Row {
   productId: string;
@@ -50,8 +50,6 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
   const [shelf, setShelf] = useState('');
   const [rows, setRows] = useState<Row[]>([{ ...emptyRow }]);
   const [discount, setDiscount] = useState(0);
-  const [taxType, setTaxType] = useState<TaxType>('NONE');
-  const [taxValue, setTaxValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [paidAmount, setPaidAmount] = useState(0);
 
@@ -83,8 +81,6 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
         })) || [{ ...emptyRow }],
       );
       setDiscount(purchase.discount);
-      setTaxType(purchase.taxType);
-      setTaxValue(purchase.taxValue);
       setNotes(purchase.notes ?? '');
       setPaidAmount(purchase.paidAmount ?? 0);
     } else {
@@ -92,7 +88,7 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
       setPurchaseDate(new Date().toISOString().slice(0, 10));
       setWarehouse(''); setRack(''); setShelf('');
       setRows([{ ...emptyRow }]);
-      setDiscount(0); setTaxType('NONE'); setTaxValue(0); setNotes(''); setPaidAmount(0);
+      setDiscount(0); setNotes(''); setPaidAmount(0);
     }
   }, [open, purchase]);
 
@@ -118,12 +114,13 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
     const validRows = rows.filter((r) => r.productId && r.quantity > 0);
     const lineTotals = validRows.map((r) => Math.max(0, r.quantity * r.purchasePrice - r.discount));
     const subTotal = lineTotals.reduce((s, x) => s + x, 0);
-    const afterDiscount = Math.max(0, subTotal - discount);
-    let taxAmount = 0;
-    if (taxType === 'PERCENT') taxAmount = (afterDiscount * taxValue) / 100;
-    else if (taxType === 'FIXED') taxAmount = taxValue;
-    return { subTotal, afterDiscount, taxAmount, total: afterDiscount + taxAmount };
-  }, [rows, discount, taxType, taxValue]);
+    const total = Math.max(0, subTotal - discount);
+    return { subTotal, total };
+  }, [rows, discount]);
+
+  const previousBalance = selectedVendor?.balance ?? 0;
+  const grandTotalDue = previousBalance + totals.total;
+  const balanceDue = Math.max(0, grandTotalDue - paidAmount);
 
   const mutation = useMutation({
     mutationFn: ({ status }: { status: 'DRAFT' | 'COMPLETED' }) => {
@@ -143,8 +140,6 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
         rack: rack || null,
         shelf: shelf || null,
         discount,
-        taxType,
-        taxValue,
         paidAmount,
         notes: notes || null,
         status,
@@ -272,45 +267,34 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
                 <span className="text-sm text-muted-foreground">Discount</span>
                 <NumberField value={discount} onValueChange={setDiscount} className="h-8 w-28 text-right" />
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">Tax</span>
-                <div className="flex items-center gap-1">
-                  <Select className="h-8 w-24" value={taxType} onChange={(e) => setTaxType(e.target.value as TaxType)}>
-                    <option value="NONE">None</option>
-                    <option value="PERCENT">%</option>
-                    <option value="FIXED">Fixed</option>
-                  </Select>
-                  <NumberField value={taxValue} onValueChange={setTaxValue} disabled={taxType === 'NONE'} className="h-8 w-24 text-right" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Tax amount</span>
-                <span className="font-medium">{formatCurrency(totals.taxAmount, currency)}</span>
-              </div>
               <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
-                <span>Total</span>
+                <span>Bill total</span>
                 <span>{formatCurrency(totals.total, currency)}</span>
               </div>
+              {selectedVendor && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Previous balance</span>
+                  <span>{formatCurrency(previousBalance, currency)}</span>
+                </div>
+              )}
+              {selectedVendor && (
+                <div className="flex items-center justify-between text-sm font-bold">
+                  <span>Grand total payable</span>
+                  <span>{formatCurrency(grandTotalDue, currency)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">Paid now</span>
                 <NumberField value={paidAmount} onValueChange={setPaidAmount} className="h-8 w-28 text-right" />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">On credit (remaining)</span>
-                <span className="font-medium text-warning">{formatCurrency(Math.max(0, totals.total - paidAmount), currency)}</span>
+                <span className="text-muted-foreground">Balance due</span>
+                {balanceDue <= 0 ? (
+                  <span className="font-medium text-success">Clear / Paid</span>
+                ) : (
+                  <span className="font-medium text-warning">{formatCurrency(balanceDue, currency)}</span>
+                )}
               </div>
-              {selectedVendor && (
-                <div className="mt-1 space-y-1 border-t border-dashed border-border pt-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Previous balance</span>
-                    <span>{formatCurrency(selectedVendor.balance, currency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm font-bold">
-                    <span>Grand total (with previous)</span>
-                    <span>{formatCurrency(selectedVendor.balance + Math.max(0, totals.total - paidAmount), currency)}</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

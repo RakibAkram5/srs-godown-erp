@@ -106,7 +106,6 @@ export interface ImportSummary {
   errors: { row: number; message: string }[];
 }
 
-export type TaxType = 'NONE' | 'PERCENT' | 'FIXED';
 export type PurchaseStatus = 'DRAFT' | 'COMPLETED';
 export type StockMovementType =
   | 'PURCHASE_IN'
@@ -143,15 +142,12 @@ export interface Purchase {
   purchaseNo: string | null;
   purchaseDate: string;
   vendorId: string;
-  vendor?: { id: string; name: string };
+  vendor?: { id: string; name: string; balance?: number };
   warehouse: string | null;
   rack: string | null;
   shelf: string | null;
   subTotal: number;
   discount: number;
-  taxType: TaxType;
-  taxValue: number;
-  taxAmount: number;
   totalAmount: number;
   paidAmount: number;
   previousBalance: number;
@@ -218,14 +214,11 @@ export interface Sale {
   saleNo: string | null;
   saleDate: string;
   dealerId: string | null;
-  dealer?: { id: string; name: string; city?: string | null; phone?: string | null };
+  dealer?: { id: string; name: string; city?: string | null; phone?: string | null; balance?: number };
   customerName: string | null;
   customerPhone: string | null;
   subTotal: number;
   discount: number;
-  taxType: TaxType;
-  taxValue: number;
-  taxAmount: number;
   totalAmount: number;
   paidAmount: number;
   previousBalance: number;

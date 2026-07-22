@@ -50,6 +50,11 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
   const companyName = settings?.companyName || DEFAULT_COMPANY_NAME;
   const companyLogo = settings?.companyLogo;
 
+  const previousBalance = sale ? (sale.status === 'COMPLETED' ? sale.previousBalance : (sale.dealer?.balance ?? 0)) : 0;
+  const grandTotalDue = sale ? previousBalance + sale.totalAmount : 0;
+  const balanceDue = sale ? Math.max(0, grandTotalDue - sale.paidAmount) : 0;
+  const isClear = balanceDue <= 0;
+
   const completeMutation = useMutation({
     mutationFn: () => salesApi.complete(sale!.id),
     onSuccess: () => {
@@ -86,11 +91,19 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
                   <div>
                     <p className="text-xl font-bold">{companyName}</p>
                     <p className="text-sm text-muted-foreground">Sale Invoice / بیل</p>
+                    {(settings?.address || settings?.phone) && (
+                      <p className="text-xs text-muted-foreground">
+                        {[settings?.address, settings?.phone].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                   </div>
                 </div>
-                <Badge variant={sale.status === 'COMPLETED' ? 'success' : 'secondary'}>
-                  {sale.status === 'COMPLETED' ? 'Completed' : 'Draft'}
-                </Badge>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant={sale.status === 'COMPLETED' ? 'success' : 'secondary'}>
+                    {sale.status === 'COMPLETED' ? 'Completed' : 'Draft'}
+                  </Badge>
+                  <Badge variant={isClear ? 'success' : 'warning'}>{isClear ? 'Paid / Clear' : 'Due'}</Badge>
+                </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
@@ -137,16 +150,18 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
               <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Sub total</span><span>{formatCurrency(sale.subTotal, currency)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>{formatCurrency(sale.discount, currency)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{formatCurrency(sale.taxAmount, currency)}</span></div>
                 <div className="flex justify-between border-t border-border pt-1 text-base font-bold"><span>Bill total</span><span>{formatCurrency(sale.totalAmount, currency)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="text-success">{formatCurrency(sale.paidAmount, currency)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Remaining (this bill)</span><span className="font-medium text-warning">{formatCurrency(Math.max(0, sale.totalAmount - sale.paidAmount), currency)}</span></div>
-                {(sale.dealerId || sale.previousBalance > 0) && (
+                {sale.dealerId && (
                   <>
-                    <div className="flex justify-between border-t border-dashed border-border pt-1"><span className="text-muted-foreground">Previous balance</span><span>{formatCurrency(sale.previousBalance, currency)}</span></div>
-                    <div className="flex justify-between text-base font-bold"><span>Grand total payable</span><span>{formatCurrency(sale.previousBalance + Math.max(0, sale.totalAmount - sale.paidAmount), currency)}</span></div>
+                    <div className="flex justify-between border-t border-dashed border-border pt-1"><span className="text-muted-foreground">Previous balance</span><span>{formatCurrency(previousBalance, currency)}</span></div>
+                    <div className="flex justify-between text-base font-bold"><span>Grand total payable</span><span>{formatCurrency(grandTotalDue, currency)}</span></div>
                   </>
                 )}
+                <div className="flex justify-between"><span className="text-muted-foreground">Paid</span><span className="text-success">{formatCurrency(sale.paidAmount, currency)}</span></div>
+                <div className="flex justify-between border-t border-border pt-1 text-base font-bold">
+                  <span>Balance due</span>
+                  {isClear ? <span className="text-success">Clear / Paid</span> : <span className="text-warning">{formatCurrency(balanceDue, currency)}</span>}
+                </div>
               </div>
 
               {sale.notes && <p className="mt-4 text-sm text-muted-foreground">Notes: {sale.notes}</p>}
@@ -158,7 +173,7 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
 
             <DialogFooter className="no-print flex-wrap">
               <Button variant="outline" onClick={handlePrint}><Printer className="h-4 w-4" />Print</Button>
-              <Button variant="outline" onClick={() => saleInvoicePdf(sale, { companyName, currency })}><Download className="h-4 w-4" />Save PDF</Button>
+              <Button variant="outline" onClick={() => saleInvoicePdf(sale, { companyName, currency, companyLogo, phone: settings?.phone, address: settings?.address, previousBalance })}><Download className="h-4 w-4" />Save PDF</Button>
               {sale.status === 'DRAFT' && (
                 <>
                   <Button variant="outline" onClick={() => { onOpenChange(false); onEdit?.(sale); }}>

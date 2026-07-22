@@ -32,14 +32,9 @@ function computeTotals(input: PurchaseInput) {
   }));
 
   const subTotal = items.reduce((s, it) => s + it.lineTotal, 0);
-  const afterDiscount = Math.max(0, subTotal - (input.discount ?? 0));
+  const totalAmount = Math.max(0, subTotal - (input.discount ?? 0));
 
-  let taxAmount = 0;
-  if (input.taxType === 'PERCENT') taxAmount = (afterDiscount * (input.taxValue ?? 0)) / 100;
-  else if (input.taxType === 'FIXED') taxAmount = input.taxValue ?? 0;
-
-  const totalAmount = afterDiscount + taxAmount;
-  return { items, subTotal, taxAmount, totalAmount };
+  return { items, subTotal, totalAmount };
 }
 
 export interface PurchaseListQuery {
@@ -95,7 +90,7 @@ export const purchaseService = {
   },
 
   async create(input: PurchaseInput) {
-    const { items, subTotal, taxAmount, totalAmount } = computeTotals(input);
+    const { items, subTotal, totalAmount } = computeTotals(input);
 
     const created = await prisma.purchase.create({
       data: {
@@ -106,11 +101,8 @@ export const purchaseService = {
         shelf: clean(input.shelf),
         subTotal,
         discount: input.discount ?? 0,
-        taxType: input.taxType,
-        taxValue: input.taxValue ?? 0,
-        taxAmount,
         totalAmount,
-        paidAmount: Math.min(input.paidAmount ?? 0, totalAmount),
+        paidAmount: Math.max(0, input.paidAmount ?? 0),
         notes: clean(input.notes),
         status: 'DRAFT',
         items: { create: items },
@@ -132,7 +124,7 @@ export const purchaseService = {
       throw ApiError.badRequest('Completed purchases cannot be edited. Create a return instead.');
     }
 
-    const { items, subTotal, taxAmount, totalAmount } = computeTotals(input);
+    const { items, subTotal, totalAmount } = computeTotals(input);
 
     await prisma.$transaction(async (tx) => {
       await tx.purchaseItem.deleteMany({ where: { purchaseId: id } });
@@ -146,11 +138,8 @@ export const purchaseService = {
           shelf: clean(input.shelf),
           subTotal,
           discount: input.discount ?? 0,
-          taxType: input.taxType,
-          taxValue: input.taxValue ?? 0,
-          taxAmount,
           totalAmount,
-          paidAmount: Math.min(input.paidAmount ?? 0, totalAmount),
+          paidAmount: Math.max(0, input.paidAmount ?? 0),
           notes: clean(input.notes),
           items: { create: items },
         },

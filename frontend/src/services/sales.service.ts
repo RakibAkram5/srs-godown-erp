@@ -15,8 +15,6 @@ export interface SalePayload {
   customerPhone?: string | null;
   saleDate?: string;
   discount?: number;
-  taxType?: 'NONE' | 'PERCENT' | 'FIXED';
-  taxValue?: number;
   paidAmount?: number;
   notes?: string | null;
   status: 'DRAFT' | 'COMPLETED';

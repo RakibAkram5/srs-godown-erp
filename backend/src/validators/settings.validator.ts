@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const updateSettingsSchema = z.object({
   body: z.object({
     companyName: z.string().min(1).optional(),
-    companyLogo: z.string().url().nullable().optional(),
+    companyLogo: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),
     address: z.string().nullable().optional(),
     currency: z.string().min(1).optional(),

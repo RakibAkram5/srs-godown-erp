@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -44,6 +44,7 @@ type FormValues = z.infer<typeof schema>;
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { setTheme } = useTheme();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -54,6 +55,8 @@ export default function SettingsPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -102,6 +105,25 @@ export default function SettingsPage() {
     onError: (err: Error) => toast.error('Could not save settings', err.message),
   });
 
+  const logoPreview = watch('companyLogo');
+
+  function onLogoFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', 'Please choose an image file.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File too large', 'Please choose a logo under 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setValue('companyLogo', reader.result as string, { shouldDirty: true });
+    reader.readAsDataURL(file);
+  }
+
   if (isLoading) return <LoadingScreen label="Loading settings…" />;
 
   const onSubmit = handleSubmit((values) => mutation.mutate(values));
@@ -134,8 +156,42 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="companyLogo">Company Logo URL</Label>
-              <Input id="companyLogo" placeholder="https://example.com/logo.png" {...register('companyLogo')} />
+              <Label htmlFor="companyLogo">Company Logo</Label>
+              <div className="flex items-center gap-3">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo preview" className="h-16 w-16 rounded border border-border object-contain" />
+                ) : (
+                  <div className="flex h-16 w-16 items-center justify-center rounded border border-dashed border-border text-xs text-muted-foreground">
+                    No logo
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <input
+                    ref={fileInputRef}
+                    id="companyLogo"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onLogoFileChange}
+                  />
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                      Upload logo
+                    </Button>
+                    {logoPreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setValue('companyLogo', '', { shouldDirty: true })}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">PNG or JPG, under 2MB. Shown on invoices and the login screen.</p>
+                </div>
+              </div>
               {errors.companyLogo && (
                 <p className="text-sm text-destructive">{errors.companyLogo.message}</p>
               )}

@@ -3,27 +3,51 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import type { Sale } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { loadLogoImage } from '@/utils/logo';
 
 interface DocMeta {
   companyName: string;
   currency: string;
+  companyLogo?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  previousBalance?: number;
 }
 
-export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
+export async function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   const doc = new jsPDF();
   const currency = meta.currency;
 
+  const logo = await loadLogoImage(meta.companyLogo);
+  const textX = logo ? 40 : 14;
+  if (logo) {
+    try {
+      doc.addImage(logo.dataUri, logo.format, 14, 10, 22, 22);
+    } catch {
+      // Corrupt/unsupported image data — skip silently, invoice still generates.
+    }
+  }
+
   doc.setFontSize(18);
-  doc.text(meta.companyName, 14, 18);
+  doc.text(meta.companyName, textX, 18);
   doc.setFontSize(11);
   doc.setTextColor(120);
-  doc.text('Sale Invoice', 14, 25);
+  doc.text('Sale Invoice', textX, 25);
+  let headerY = 25;
+  if (meta.address || meta.phone) {
+    headerY += 5;
+    doc.setFontSize(9);
+    doc.text([meta.address, meta.phone].filter(Boolean).join('  |  '), textX, headerY);
+  }
 
   doc.setTextColor(20);
   doc.setFontSize(10);
-  doc.text(`Bill No: ${sale.saleNo ?? '-'}`, 14, 36);
-  doc.text(`Date: ${formatDate(sale.saleDate)}`, 14, 42);
-  let infoY = 48;
+  let infoY = Math.max(36, headerY + 11);
+  doc.text(`Bill No: ${sale.saleNo ?? '-'}`, 14, infoY);
+  doc.text(`Status: ${sale.status}`, 140, infoY);
+  infoY += 6;
+  doc.text(`Date: ${formatDate(sale.saleDate)}`, 14, infoY);
+  infoY += 6;
   if (sale.dealer) {
     doc.text(`Dealer: ${sale.dealer.name}`, 14, infoY); infoY += 6;
     if (sale.dealer.city) { doc.text(`City: ${sale.dealer.city}`, 14, infoY); infoY += 6; }
@@ -31,7 +55,6 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   } else {
     doc.text(`Customer: ${sale.customerName || 'Walk-in'}`, 14, infoY); infoY += 6;
   }
-  doc.text(`Status: ${sale.status}`, 140, 36);
 
   const body = (sale.items ?? []).map((it, i) => [
     i + 1,
@@ -54,19 +77,26 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const endY = (doc as any).lastAutoTable.finalY + 8;
   const right = 196;
+  const previousBalance = meta.previousBalance ?? sale.previousBalance;
+  const grandTotalDue = previousBalance + sale.totalAmount;
+  const balanceDue = Math.max(0, grandTotalDue - sale.paidAmount);
+
   doc.setFontSize(10);
   doc.text(`Sub total: ${formatCurrency(sale.subTotal, currency)}`, right, endY, { align: 'right' });
   doc.text(`Discount: ${formatCurrency(sale.discount, currency)}`, right, endY + 6, { align: 'right' });
-  doc.text(`Tax: ${formatCurrency(sale.taxAmount, currency)}`, right, endY + 12, { align: 'right' });
   doc.setFontSize(11);
-  doc.text(`Bill total: ${formatCurrency(sale.totalAmount, currency)}`, right, endY + 20, { align: 'right' });
-  const remaining = Math.max(0, sale.totalAmount - sale.paidAmount);
+  doc.text(`Bill total: ${formatCurrency(sale.totalAmount, currency)}`, right, endY + 14, { align: 'right' });
   doc.setFontSize(10);
-  doc.text(`Paid: ${formatCurrency(sale.paidAmount, currency)}`, right, endY + 27, { align: 'right' });
-  doc.text(`Remaining (this bill): ${formatCurrency(remaining, currency)}`, right, endY + 33, { align: 'right' });
-  doc.text(`Previous balance: ${formatCurrency(sale.previousBalance, currency)}`, right, endY + 39, { align: 'right' });
+  doc.text(`Previous balance: ${formatCurrency(previousBalance, currency)}`, right, endY + 21, { align: 'right' });
+  doc.text(`Grand total payable: ${formatCurrency(grandTotalDue, currency)}`, right, endY + 27, { align: 'right' });
+  doc.text(`Paid: ${formatCurrency(sale.paidAmount, currency)}`, right, endY + 33, { align: 'right' });
   doc.setFontSize(12);
-  doc.text(`Grand total payable: ${formatCurrency(sale.previousBalance + remaining, currency)}`, right, endY + 47, { align: 'right' });
+  doc.text(
+    balanceDue <= 0 ? 'Balance due: Clear / Paid' : `Balance due: ${formatCurrency(balanceDue, currency)}`,
+    right,
+    endY + 41,
+    { align: 'right' },
+  );
 
   if (sale.notes) {
     doc.setFontSize(9);
@@ -74,7 +104,7 @@ export function saleInvoicePdf(sale: Sale, meta: DocMeta) {
     doc.text(`Notes: ${sale.notes}`, 14, endY + 20);
   }
 
-    doc.setFontSize(8);
+  doc.setFontSize(8);
   doc.setTextColor(130);
   doc.text('Developed by SRS Matrix  |  Contact: 03014334151', 105, 290, { align: 'center' });
   doc.save(`${sale.saleNo ?? 'sale'}.pdf`);
@@ -88,7 +118,6 @@ export function exportSalesExcel(sales: Sale[], fileName = 'sales.xlsx') {
     Items: s._count?.items ?? s.items?.length ?? 0,
     'Sub Total': s.subTotal,
     Discount: s.discount,
-    Tax: s.taxAmount,
     Total: s.totalAmount,
     Status: s.status,
   }));

@@ -1,5 +1,5 @@
 import { api, unwrap } from './api';
-import type { Purchase, PurchaseListResult, PurchaseReturn, StockMovement, TaxType } from '@/types';
+import type { Purchase, PurchaseListResult, PurchaseReturn, StockMovement } from '@/types';
 
 export interface PurchaseItemPayload {
   productId: string;
@@ -16,8 +16,6 @@ export interface PurchasePayload {
   rack?: string | null;
   shelf?: string | null;
   discount?: number;
-  taxType?: TaxType;
-  taxValue?: number;
   paidAmount?: number;
   notes?: string | null;
   status: 'DRAFT' | 'COMPLETED';

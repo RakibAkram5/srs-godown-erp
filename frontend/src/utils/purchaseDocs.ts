@@ -3,28 +3,53 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import type { Purchase } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/formatters';
+import { loadLogoImage } from '@/utils/logo';
 
 interface DocMeta {
   companyName: string;
   currency: string;
+  companyLogo?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  previousBalance?: number;
 }
 
-export function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
+export async function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
   const doc = new jsPDF();
   const currency = meta.currency;
 
+  const logo = await loadLogoImage(meta.companyLogo);
+  const textX = logo ? 40 : 14;
+  if (logo) {
+    try {
+      doc.addImage(logo.dataUri, logo.format, 14, 10, 22, 22);
+    } catch {
+      // Corrupt/unsupported image data — skip silently, invoice still generates.
+    }
+  }
+
   doc.setFontSize(18);
-  doc.text(meta.companyName, 14, 18);
+  doc.text(meta.companyName, textX, 18);
   doc.setFontSize(11);
   doc.setTextColor(120);
-  doc.text('Purchase Invoice', 14, 25);
+  doc.text('Purchase Invoice', textX, 25);
+  let headerY = 25;
+  if (meta.address || meta.phone) {
+    headerY += 5;
+    doc.setFontSize(9);
+    doc.text([meta.address, meta.phone].filter(Boolean).join('  |  '), textX, headerY);
+  }
 
   doc.setTextColor(20);
   doc.setFontSize(10);
-  doc.text(`Purchase No: ${purchase.purchaseNo ?? '-'}`, 14, 36);
-  doc.text(`Date: ${formatDate(purchase.purchaseDate)}`, 14, 42);
-  doc.text(`Vendor: ${purchase.vendor?.name ?? '-'}`, 14, 48);
-  doc.text(`Status: ${purchase.status}`, 140, 36);
+  let infoY = Math.max(36, headerY + 11);
+  doc.text(`Purchase No: ${purchase.purchaseNo ?? '-'}`, 14, infoY);
+  doc.text(`Status: ${purchase.status}`, 140, infoY);
+  infoY += 6;
+  doc.text(`Date: ${formatDate(purchase.purchaseDate)}`, 14, infoY);
+  infoY += 6;
+  doc.text(`Vendor: ${purchase.vendor?.name ?? '-'}`, 14, infoY);
+  infoY += 6;
 
   const body = (purchase.items ?? []).map((it, i) => [
     i + 1,
@@ -36,7 +61,7 @@ export function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
   ]);
 
   autoTable(doc, {
-    startY: 56,
+    startY: infoY + 4,
     head: [['#', 'Product', 'Qty', 'Price', 'Discount', 'Total']],
     body,
     theme: 'striped',
@@ -47,12 +72,26 @@ export function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const endY = (doc as any).lastAutoTable.finalY + 8;
   const right = 196;
+  const previousBalance = meta.previousBalance ?? purchase.previousBalance;
+  const grandTotalDue = previousBalance + purchase.totalAmount;
+  const balanceDue = Math.max(0, grandTotalDue - purchase.paidAmount);
+
   doc.setFontSize(10);
   doc.text(`Sub total: ${formatCurrency(purchase.subTotal, currency)}`, right, endY, { align: 'right' });
   doc.text(`Discount: ${formatCurrency(purchase.discount, currency)}`, right, endY + 6, { align: 'right' });
-  doc.text(`Tax: ${formatCurrency(purchase.taxAmount, currency)}`, right, endY + 12, { align: 'right' });
+  doc.setFontSize(11);
+  doc.text(`Bill total: ${formatCurrency(purchase.totalAmount, currency)}`, right, endY + 14, { align: 'right' });
+  doc.setFontSize(10);
+  doc.text(`Previous balance: ${formatCurrency(previousBalance, currency)}`, right, endY + 21, { align: 'right' });
+  doc.text(`Grand total payable: ${formatCurrency(grandTotalDue, currency)}`, right, endY + 27, { align: 'right' });
+  doc.text(`Paid: ${formatCurrency(purchase.paidAmount, currency)}`, right, endY + 33, { align: 'right' });
   doc.setFontSize(12);
-  doc.text(`Total: ${formatCurrency(purchase.totalAmount, currency)}`, right, endY + 20, { align: 'right' });
+  doc.text(
+    balanceDue <= 0 ? 'Balance due: Clear / Paid' : `Balance due: ${formatCurrency(balanceDue, currency)}`,
+    right,
+    endY + 41,
+    { align: 'right' },
+  );
 
   if (purchase.notes) {
     doc.setFontSize(9);
@@ -60,7 +99,7 @@ export function purchaseInvoicePdf(purchase: Purchase, meta: DocMeta) {
     doc.text(`Notes: ${purchase.notes}`, 14, endY + 20);
   }
 
-    doc.setFontSize(8);
+  doc.setFontSize(8);
   doc.setTextColor(130);
   doc.text('Developed by SRS Matrix  |  Contact: 03014334151', 105, 290, { align: 'center' });
   doc.save(`${purchase.purchaseNo ?? 'purchase'}.pdf`);
@@ -74,7 +113,6 @@ export function exportPurchasesExcel(purchases: Purchase[], fileName = 'purchase
     Items: p._count?.items ?? p.items?.length ?? 0,
     'Sub Total': p.subTotal,
     Discount: p.discount,
-    Tax: p.taxAmount,
     Total: p.totalAmount,
     Status: p.status,
   }));

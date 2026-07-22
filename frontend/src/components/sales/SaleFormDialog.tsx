@@ -21,7 +21,7 @@ import { salesApi, type SalePayload } from '@/services/sales.service';
 import { settingsService } from '@/services/settings.service';
 import { formatCurrency } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
-import type { Sale, TaxType } from '@/types';
+import type { Sale } from '@/types';
 
 interface Row {
   productId: string;
@@ -50,8 +50,6 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState<Row[]>([{ ...emptyRow }]);
   const [discount, setDiscount] = useState(0);
-  const [taxType, setTaxType] = useState<TaxType>('NONE');
-  const [taxValue, setTaxValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [paidAmount, setPaidAmount] = useState(0);
 
@@ -86,8 +84,6 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
         }) || [{ ...emptyRow }],
       );
       setDiscount(sale.discount);
-      setTaxType(sale.taxType);
-      setTaxValue(sale.taxValue);
       setNotes(sale.notes ?? '');
       setPaidAmount(sale.paidAmount ?? 0);
     } else {
@@ -95,7 +91,7 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
       setCustomerName(''); setCustomerPhone('');
       setSaleDate(new Date().toISOString().slice(0, 10));
       setRows([{ ...emptyRow }]);
-      setDiscount(0); setTaxType('NONE'); setTaxValue(0); setNotes(''); setPaidAmount(0);
+      setDiscount(0); setNotes(''); setPaidAmount(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, sale]);
@@ -127,12 +123,13 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
   const totals = useMemo(() => {
     const valid = rows.filter((r) => r.productId && r.quantity > 0);
     const subTotal = valid.reduce((s, r) => s + Math.max(0, r.quantity * r.salePrice - r.discount), 0);
-    const afterDiscount = Math.max(0, subTotal - discount);
-    let taxAmount = 0;
-    if (taxType === 'PERCENT') taxAmount = (afterDiscount * taxValue) / 100;
-    else if (taxType === 'FIXED') taxAmount = taxValue;
-    return { subTotal, taxAmount, total: afterDiscount + taxAmount };
-  }, [rows, discount, taxType, taxValue]);
+    const total = Math.max(0, subTotal - discount);
+    return { subTotal, total };
+  }, [rows, discount]);
+
+  const previousBalance = selectedDealer?.balance ?? 0;
+  const grandTotalDue = previousBalance + totals.total;
+  const balanceDue = Math.max(0, grandTotalDue - paidAmount);
 
   const mutation = useMutation({
     mutationFn: ({ status }: { status: 'DRAFT' | 'COMPLETED' }) => {
@@ -145,8 +142,6 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
         customerPhone: customerPhone || null,
         saleDate,
         discount,
-        taxType,
-        taxValue,
         paidAmount,
         notes: notes || null,
         status,
@@ -263,45 +258,34 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
                 <span className="text-sm text-muted-foreground">Discount</span>
                 <NumberField value={discount} onValueChange={setDiscount} className="h-8 w-28 text-right" />
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">Tax</span>
-                <div className="flex items-center gap-1">
-                  <Select className="h-8 w-24" value={taxType} onChange={(e) => setTaxType(e.target.value as TaxType)}>
-                    <option value="NONE">None</option>
-                    <option value="PERCENT">%</option>
-                    <option value="FIXED">Fixed</option>
-                  </Select>
-                  <NumberField value={taxValue} onValueChange={setTaxValue} disabled={taxType === 'NONE'} className="h-8 w-24 text-right" />
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Tax amount</span>
-                <span className="font-medium">{formatCurrency(totals.taxAmount, currency)}</span>
-              </div>
               <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
-                <span>Total</span>
+                <span>Bill total</span>
                 <span>{formatCurrency(totals.total, currency)}</span>
               </div>
+              {selectedDealer && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Previous balance</span>
+                  <span>{formatCurrency(previousBalance, currency)}</span>
+                </div>
+              )}
+              {selectedDealer && (
+                <div className="flex items-center justify-between text-sm font-bold">
+                  <span>Grand total payable</span>
+                  <span>{formatCurrency(grandTotalDue, currency)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">Paid now</span>
                 <NumberField value={paidAmount} onValueChange={setPaidAmount} className="h-8 w-28 text-right" />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Remaining (this bill)</span>
-                <span className="font-medium text-warning">{formatCurrency(Math.max(0, totals.total - paidAmount), currency)}</span>
+                <span className="text-muted-foreground">Balance due</span>
+                {balanceDue <= 0 ? (
+                  <span className="font-medium text-success">Clear / Paid</span>
+                ) : (
+                  <span className="font-medium text-warning">{formatCurrency(balanceDue, currency)}</span>
+                )}
               </div>
-              {selectedDealer && (
-                <div className="mt-1 space-y-1 border-t border-dashed border-border pt-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Previous balance</span>
-                    <span>{formatCurrency(selectedDealer.balance, currency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm font-bold">
-                    <span>Grand total (with previous)</span>
-                    <span>{formatCurrency(selectedDealer.balance + Math.max(0, totals.total - paidAmount), currency)}</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
