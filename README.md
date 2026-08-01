@@ -1,9 +1,23 @@
-# SRS Godown ERP — Phase 13 (Adjustments, Pending Ledger, Payments & Pro Excel)
+# SRS Godown ERP — Phase 14 (Forgot Password, Vercel Deployment & Sale Guardrails)
 
 A modern, fast and beginner-friendly ERP for a **bike spare parts warehouse**.
 
 **Phase 2** adds a complete, production-ready **Authentication & User Management** system on top of
 the Phase 1 foundation, without changing the existing structure, layout, theme or design.
+
+**What's new in Phase 14**
+
+- **Forgot password (OTP via email)**: two-step flow — request a 6-digit code, then enter it with a
+  new password. Codes are hashed at rest, expire in 10 minutes, are single-use and capped at 5 verify
+  attempts; the response never reveals whether a username exists (anti-enumeration). Emails are sent
+  with **Resend**; if `RESEND_API_KEY` isn't set, the OTP is logged to the console instead, so local
+  dev needs no email account. A successful reset revokes all refresh tokens and clears any lockout.
+- **New sales are admin-only**: creating an invoice is now restricted to Admins (backend guard +
+  hidden frontend controls); editing/deleting an existing sale is unchanged. The invoice item table
+  (view + PDF) was reordered and bordered for a clearer Sr. No./Item/Rate/Qty layout, and the invoice
+  view now auto-opens right after a sale is created.
+- **Backend now deploys to Vercel** (serverless) alongside the frontend, instead of Render —
+  see [Deployment](#️-deployment) below.
 
 **What's new in Phase 13 — the final build**
 
@@ -322,6 +336,17 @@ npm run dev                   # starts http://localhost:5000
 > New Admin-only menus: **Payments** (edit/delete) and **Pending Ledger** (unpaid invoices).
 > Ledgers now have an **Adjust** button, and every report exports as a **professionally formatted Excel** file.
 
+> **Adding Phase 14 (Forgot Password)?** It adds the `password_reset_otps` table — no reset needed:
+>
+> ```bash
+> npm run prisma:generate
+> npm run prisma:push
+> ```
+>
+> The login page's **Forgot password** link now works end-to-end. Set `RESEND_API_KEY` /
+> `RESEND_FROM_EMAIL` to send real emails, or leave them unset and read the OTP from the backend
+> console during local dev. Note: only Admins can create new sales from now on.
+
 Health check: **GET** `http://localhost:5000/api/health`
 
 ### 2. Frontend
@@ -363,6 +388,8 @@ Password: admin123
 | `SEED_ADMIN_USERNAME` | Admin username created by the seed   | `admin`                                             |
 | `SEED_ADMIN_PASSWORD` | Admin password created by the seed   | `admin123`                                          |
 | `SEED_ADMIN_EMAIL`    | Admin email created by the seed      | `admin@srsgodown.com`                               |
+| `RESEND_API_KEY`      | Resend API key for forgot-password OTP emails (optional — OTP is logged to console if unset) | `re_xxxxxxxx` |
+| `RESEND_FROM_EMAIL`   | From address used for OTP emails     | `onboarding@resend.dev`                             |
 
 ### Frontend (`frontend/.env`)
 
@@ -397,6 +424,7 @@ Phase 2 defines these tables:
 - **`expenses`** — warehouse/godown expenses (feeds the P&L)
 - **`salaries`** — monthly employee salary records with payment status
 - **`adjustments`** — manual dealer/vendor balance corrections (feed the ledgers)
+- **`password_reset_otps`** — hashed forgot-password OTPs (10-min expiry, single-use, max 5 attempts)
 - **`settings`** — company name, logo, phone, address, currency, language, theme, timestamps
 
 No inventory/business tables exist yet — that's by design for this phase.
@@ -418,6 +446,8 @@ npm run db:seed           # (re)seed admin + settings
 | ------ | -------------------- | ---- | ------------------------------- |
 | GET    | `/api/health`        | –    | Service + database health check |
 | POST   | `/api/auth/login`         | –    | Sign in (username + password), returns access + refresh tokens |
+| POST   | `/api/auth/forgot-password` | –  | Request a 6-digit OTP by email (rate-limited) |
+| POST   | `/api/auth/reset-password`  | –  | Verify OTP + set a new password (rate-limited) |
 | POST   | `/api/auth/refresh`       | –    | Exchange a refresh token for a new access token |
 | POST   | `/api/auth/logout`        | ✅   | Revoke refresh token + end session |
 | GET    | `/api/auth/profile`       | ✅   | Current authenticated user      |
@@ -494,28 +524,38 @@ All responses use a consistent envelope: `{ success, message, data }`.
 ## ☁️ Deployment
 
 CI runs automatically on every push/PR to `main` via `.github/workflows/ci.yml` (typecheck + lint +
-build for both apps). Actual hosting uses three free-tier services, each auto-deploying from this
-GitHub repo — no servers to manage:
+build for both apps). Hosting is two separate **Vercel** projects (backend as a serverless function,
+frontend as a static/Vite build) plus a managed Postgres, each auto-deploying from this GitHub repo —
+no servers to manage:
 
-| Layer    | Service                                  | Config file      |
-| -------- | ----------------------------------------- | ---------------- |
-| Database | [Neon](https://neon.tech) (Postgres)      | —                 |
-| Backend  | [Render](https://render.com) (Docker web service) | `render.yaml`, `backend/Dockerfile` |
-| Frontend | [Vercel](https://vercel.com) (static/Vite) | `frontend/vercel.json` |
+| Layer    | Service                                     | Config file / entrypoint                     |
+| -------- | -------------------------------------------- | ---------------------------------------------- |
+| Database | [Neon](https://neon.tech) (Postgres)         | —                                               |
+| Backend  | [Vercel](https://vercel.com) (serverless function) | `backend/vercel.json`, `backend/api/index.ts` |
+| Frontend | [Vercel](https://vercel.com) (static/Vite)   | `frontend/vercel.json`                          |
+
+The backend's `api/index.ts` imports the **built** `dist/app` (not raw TS source), since Vercel's
+serverless bundler doesn't rewrite the `@/*` path aliases used throughout `src/` — `npm run build`
+must run first, which `backend/vercel.json`'s `buildCommand` does, along with `prisma migrate deploy`.
 
 **One-time setup (manual — needs your own accounts):**
 
 1. **Neon** — create a project, copy the pooled connection string (`postgresql://...`).
-2. **Render** — New → Blueprint → connect this GitHub repo (it reads `render.yaml` automatically).
-   When prompted, fill in the `sync: false` env vars: `DATABASE_URL` (from Neon), `CORS_ORIGIN`
-   (your Vercel URL — can be added after step 3), and `SEED_ADMIN_*`. `JWT_SECRET`/`JWT_REFRESH_SECRET`
-   are auto-generated by Render. On first deploy it runs `prisma migrate deploy` automatically.
-3. **Vercel** — New Project → import this repo → set **Root Directory** to `frontend` → add env var
-   `VITE_API_URL` = your Render backend URL + `/api` (e.g. `https://srs-godown-backend.onrender.com/api`).
-4. Go back to Render and set `CORS_ORIGIN` to your Vercel URL, then trigger a redeploy.
+2. **Vercel (backend)** — New Project → import this repo → set **Root Directory** to `backend` →
+   add env vars: `DATABASE_URL` (from Neon), `JWT_SECRET`, `JWT_REFRESH_SECRET`, `CORS_ORIGIN` (your
+   frontend's Vercel URL — can be added after step 3), `SEED_ADMIN_*`, and optionally
+   `RESEND_API_KEY` / `RESEND_FROM_EMAIL` for OTP emails.
+3. **Vercel (frontend)** — New Project → import this repo again → set **Root Directory** to
+   `frontend` → add env var `VITE_API_URL` = your backend's Vercel URL + `/api`
+   (e.g. `https://srs-godown-erp.vercel.app/api`).
+4. Go back to the backend project and set `CORS_ORIGIN` to the frontend's Vercel URL, then redeploy.
 
-After that, every `git push` to `main` redeploys both automatically — Render and Vercel watch the
+After that, every `git push` to `main` redeploys both projects automatically — Vercel watches the
 repo directly, so no deploy secrets live in GitHub Actions.
+
+> A Render-based alternative for the backend (`render.yaml`, `backend/Dockerfile`, Docker web
+> service) is still kept in the repo and works the same way, if you'd rather not run the backend as
+> a serverless function.
 
 ---
 
