@@ -30,4 +30,3 @@ prisma/migrations/dev.db*
 .agents/
 skills-lock.json
 /package-lock.json
-.local-backup/
