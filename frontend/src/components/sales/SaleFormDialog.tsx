@@ -28,7 +28,7 @@ interface Row {
   productName: string;
   quantity: number;
   salePrice: number;
-  discount: number;
+  discountPercent: number;
   available: number;
 }
 
@@ -38,7 +38,16 @@ interface Props {
   sale?: Sale | null;
 }
 
-const emptyRow: Row = { productId: '', productName: '', quantity: 1, salePrice: 0, discount: 0, available: 0 };
+const emptyRow: Row = { productId: '', productName: '', quantity: 1, salePrice: 0, discountPercent: 0, available: 0 };
+
+// Legacy rows (saved before percentage-based discounts existed) have a fixed
+// `discount` amount but `discountPercent` of 0. Back-derive a percent so
+// re-opening an old draft doesn't silently zero out its discount.
+function derivePercent(discountPercent: number | undefined, discount: number, gross: number): number {
+  if (discountPercent) return discountPercent;
+  if (discount > 0 && gross > 0) return Math.min(100, (discount / gross) * 100);
+  return 0;
+}
 
 export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
   const queryClient = useQueryClient();
@@ -49,7 +58,7 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState<Row[]>([{ ...emptyRow }]);
-  const [discount, setDiscount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [notes, setNotes] = useState('');
   const [paidAmount, setPaidAmount] = useState(0);
 
@@ -78,12 +87,12 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
             productName: it.productName,
             quantity: it.quantity,
             salePrice: it.salePrice,
-            discount: it.discount,
+            discountPercent: derivePercent(it.discountPercent, it.discount, it.quantity * it.salePrice),
             available: p?.currentStock ?? 0,
           };
         }) || [{ ...emptyRow }],
       );
-      setDiscount(sale.discount);
+      setDiscountPercent(derivePercent(sale.discountPercent, sale.discount, sale.subTotal));
       setNotes(sale.notes ?? '');
       setPaidAmount(sale.paidAmount ?? 0);
     } else {
@@ -91,7 +100,7 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
       setCustomerName(''); setCustomerPhone('');
       setSaleDate(new Date().toISOString().slice(0, 10));
       setRows([{ ...emptyRow }]);
-      setDiscount(0); setNotes(''); setPaidAmount(0);
+      setDiscountPercent(0); setNotes(''); setPaidAmount(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, sale]);
@@ -122,12 +131,18 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
 
   const totals = useMemo(() => {
     const valid = rows.filter((r) => r.productId && r.quantity > 0);
-    const subTotal = valid.reduce((s, r) => s + Math.max(0, r.quantity * r.salePrice - r.discount), 0);
-    const total = Math.max(0, subTotal - discount);
-    return { subTotal, total };
-  }, [rows, discount]);
+    const subTotal = valid.reduce((s, r) => {
+      const gross = r.quantity * r.salePrice;
+      const lineDiscount = gross * (r.discountPercent / 100);
+      return s + Math.max(0, gross - lineDiscount);
+    }, 0);
+    const overallDiscount = subTotal * (discountPercent / 100);
+    const total = Math.max(0, subTotal - overallDiscount);
+    return { subTotal, overallDiscount, total };
+  }, [rows, discountPercent]);
 
   const previousBalance = selectedDealer?.balance ?? 0;
+  const showPreviousBalance = !!selectedDealer && previousBalance !== 0;
   const grandTotalDue = previousBalance + totals.total;
   const balanceDue = Math.max(0, grandTotalDue - paidAmount);
 
@@ -135,13 +150,13 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
     mutationFn: ({ status }: { status: 'DRAFT' | 'COMPLETED' }) => {
       const items = rows
         .filter((r) => r.productId && r.quantity > 0)
-        .map((r) => ({ productId: r.productId, productName: r.productName, quantity: r.quantity, salePrice: r.salePrice, discount: r.discount }));
+        .map((r) => ({ productId: r.productId, productName: r.productName, quantity: r.quantity, salePrice: r.salePrice, discountPercent: r.discountPercent }));
       const payload: SalePayload = {
         dealerId: dealerId || null,
         customerName: customerName || null,
         customerPhone: customerPhone || null,
         saleDate,
-        discount,
+        discountPercent,
         paidAmount,
         notes: notes || null,
         status,
@@ -208,7 +223,9 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
             <Label className="mb-2 block">Products</Label>
             <div className="space-y-2">
               {rows.map((row, i) => {
-                const lineTotal = Math.max(0, row.quantity * row.salePrice - row.discount);
+                const gross = row.quantity * row.salePrice;
+                const lineDiscountAmount = gross * (row.discountPercent / 100);
+                const lineTotal = Math.max(0, gross - lineDiscountAmount);
                 const over = row.productId && row.quantity > row.available;
                 return (
                   <div key={i} className="grid grid-cols-12 items-end gap-2 rounded-md border border-border p-2">
@@ -229,8 +246,14 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
                       <NumberField value={row.salePrice} onValueChange={(n) => updateRow(i, { salePrice: n })} />
                     </div>
                     <div className="col-span-3 sm:col-span-2">
-                      <Label className="text-xs text-muted-foreground">Discount</Label>
-                      <NumberField value={row.discount} onValueChange={(n) => updateRow(i, { discount: n })} />
+                      <Label className="text-xs text-muted-foreground">Discount %</Label>
+                      <NumberField
+                        value={row.discountPercent}
+                        onValueChange={(n) => updateRow(i, { discountPercent: Math.min(100, Math.max(0, n)) })}
+                      />
+                      {row.discountPercent > 0 && (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">-{formatCurrency(lineDiscountAmount, currency)}</p>
+                      )}
                     </div>
                     <div className="col-span-1 flex flex-col items-end sm:col-span-2">
                       <Label className="w-full text-right text-xs text-muted-foreground">Total</Label>
@@ -263,20 +286,29 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
                 <span className="font-medium">{formatCurrency(totals.subTotal, currency)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">Discount</span>
-                <NumberField value={discount} onValueChange={setDiscount} className="h-8 w-28 text-right" />
+                <span className="text-sm text-muted-foreground">Discount %</span>
+                <div className="flex items-center gap-2">
+                  {discountPercent > 0 && (
+                    <span className="text-xs text-muted-foreground">-{formatCurrency(totals.overallDiscount, currency)}</span>
+                  )}
+                  <NumberField
+                    value={discountPercent}
+                    onValueChange={(n) => setDiscountPercent(Math.min(100, Math.max(0, n)))}
+                    className="h-8 w-20 text-right"
+                  />
+                </div>
               </div>
               <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
                 <span>Bill total</span>
                 <span>{formatCurrency(totals.total, currency)}</span>
               </div>
-              {selectedDealer && (
+              {showPreviousBalance && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Previous balance</span>
                   <span>{formatCurrency(previousBalance, currency)}</span>
                 </div>
               )}
-              {selectedDealer && (
+              {showPreviousBalance && (
                 <div className="flex items-center justify-between text-sm font-bold">
                   <span>Grand total payable</span>
                   <span>{formatCurrency(grandTotalDue, currency)}</span>

@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/config/prisma';
 
 const saleInclude = {
-  sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true } } } },
+  sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true, city: true } } } },
 };
 
 export const dispatchRepository = {

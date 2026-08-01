@@ -44,6 +44,7 @@ import { SaleFormDialog } from '@/components/sales/SaleFormDialog';
 import { SaleViewDialog } from '@/components/sales/SaleViewDialog';
 import { SaleReturnDialog } from '@/components/sales/SaleReturnDialog';
 import { salesApi, type SaleQuery } from '@/services/sales.service';
+import { dealersApi } from '@/services/dealers.service';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAdmin } from '@/lib/navigation';
 import { settingsService } from '@/services/settings.service';
@@ -70,6 +71,7 @@ export default function SalesPage() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState('all');
+  const [city, setCity] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('createdAt');
@@ -90,16 +92,23 @@ export default function SalesPage() {
   const query: SaleQuery = useMemo(() => ({
     search: debounced || undefined,
     status,
+    city: city || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     sortBy, sortOrder, page, limit: PAGE_SIZE,
-  }), [debounced, status, dateFrom, dateTo, sortBy, sortOrder, page]);
+  }), [debounced, status, city, dateFrom, dateTo, sortBy, sortOrder, page]);
 
   const salesQuery = useQuery({
     queryKey: ['sales', query],
     queryFn: () => salesApi.list(query),
     enabled: tab === 'sales',
   });
+
+  const { data: dealersForCities } = useQuery({ queryKey: ['dealers'], queryFn: () => dealersApi.list(undefined, 'active') });
+  const cities = useMemo(
+    () => Array.from(new Set((dealersForCities ?? []).map((d) => d.city).filter((c): c is string => !!c))).sort(),
+    [dealersForCities],
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => salesApi.remove(id),
@@ -206,6 +215,10 @@ export default function SalesPage() {
               <option value="DRAFT">Draft</option>
               <option value="COMPLETED">Completed</option>
             </Select>
+            <Select value={city} onChange={(e) => { setCity(e.target.value); setPage(1); }} className="lg:w-40">
+              <option value="">All cities</option>
+              {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </Select>
             <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="lg:w-40" />
             <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="lg:w-40" />
           </div>
@@ -223,6 +236,7 @@ export default function SalesPage() {
                       <TableHead>Sale No</TableHead>
                       <TableHead><button className="inline-flex items-center gap-1" onClick={() => toggleSort('saleDate')}>Date <SortIcon column="saleDate" /></button></TableHead>
                       <TableHead>Customer</TableHead>
+                      <TableHead>City</TableHead>
                       <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right"><button className="inline-flex items-center gap-1" onClick={() => toggleSort('totalAmount')}>Total <SortIcon column="totalAmount" /></button></TableHead>
                       <TableHead>Status</TableHead>
@@ -234,7 +248,8 @@ export default function SalesPage() {
                       <TableRow key={s.id}>
                         <TableCell><button className="font-medium hover:text-primary" onClick={() => setViewingId(s.id)}>{s.saleNo}</button></TableCell>
                         <TableCell className="whitespace-nowrap">{formatDate(s.saleDate)}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.customerName || 'Walk-in'}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.dealer?.name || s.customerName || 'Walk-in'}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.dealer?.city ?? '—'}</TableCell>
                         <TableCell className="text-center">{s.totalQuantity ?? s._count?.items ?? 0}</TableCell>
                         <TableCell className="whitespace-nowrap text-right font-medium">{formatCurrency(s.totalAmount, currency)}</TableCell>
                         <TableCell>

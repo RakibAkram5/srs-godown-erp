@@ -41,6 +41,12 @@ export function formatCurrency(value: number, currency = 'PKR'): string {
   return `${symbol} ${formatNumber(value, 0)}`;
 }
 
+// Trims trailing zeros: 12 -> "12%", 12.5 -> "12.5%", 12.3333 -> "12.33%".
+export function formatPercent(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%`;
+}
+
 /* Human-friendly "time ago" for activity feeds. */
 export function timeAgo(value: string | number | Date): string {
   const date = value instanceof Date ? value : new Date(value);

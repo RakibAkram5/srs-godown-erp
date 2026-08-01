@@ -5,7 +5,7 @@ const saleItem = z.object({
   productName: z.string().min(1),
   quantity: z.coerce.number().int('Quantity must be a whole number').positive('Quantity must be greater than 0'),
   salePrice: z.coerce.number().min(0, 'Price cannot be negative'),
-  discount: z.coerce.number().min(0).default(0),
+  discountPercent: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot exceed 100%').default(0),
 });
 
 const saleBody = z.object({
@@ -13,7 +13,7 @@ const saleBody = z.object({
   customerName: z.string().trim().optional().or(z.literal('')).nullable(),
   customerPhone: z.string().trim().optional().or(z.literal('')).nullable(),
   saleDate: z.coerce.date().optional(),
-  discount: z.coerce.number().min(0).default(0),
+  discountPercent: z.coerce.number().min(0, 'Discount cannot be negative').max(100, 'Discount cannot exceed 100%').default(0),
   paidAmount: z.coerce.number().min(0).default(0),
   notes: z.string().trim().optional().or(z.literal('')).nullable(),
   status: z.enum(['DRAFT', 'COMPLETED']).default('DRAFT'),

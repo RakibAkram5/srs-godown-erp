@@ -371,6 +371,7 @@ model Sale {
 
   subTotal        Float      @default(0) @map("sub_total")
   discount        Float      @default(0)
+  discountPercent Float      @default(0) @map("discount_percent")
   totalAmount     Float      @default(0) @map("total_amount")
   paidAmount      Float      @default(0) @map("paid_amount")
   previousBalance Float      @default(0) @map("previous_balance")
@@ -401,6 +402,7 @@ model SaleItem {
   pendingDiscount Float  @default(0) @map("pending_discount")
   salePrice       Float  @map("sale_price")
   discount        Float  @default(0)
+  discountPercent Float  @default(0) @map("discount_percent")
   lineTotal       Float  @map("line_total")
 
   @@index([saleId])
@@ -525,6 +527,7 @@ model Dispatch {
   city            String
   dispatchDate    DateTime @default(now()) @map("dispatch_date")
   notes           String?
+  images          String[] @default([])
 
   createdAt DateTime @default(now()) @map("created_at")
 

@@ -156,4 +156,7 @@
   .print-target thead { display: table-header-group; } /* repeat header each page */
   .invoice-terms { break-inside: avoid; page-break-inside: avoid; margin-top: 16px; }
   .print-target img { max-height: 64px; }
+  /* Bilty attachments should print large enough to actually read, unlike the small header logo. */
+  .print-target .dispatch-images img { max-height: 160px; max-width: 100%; }
+  .print-target .dispatch-images { break-inside: avoid; page-break-inside: avoid; }
 }

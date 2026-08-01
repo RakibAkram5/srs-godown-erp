@@ -24,7 +24,7 @@ import { salesApi } from '@/services/sales.service';
 import { settingsService } from '@/services/settings.service';
 import { DEFAULT_COMPANY_NAME, INVOICE_FOOTER } from '@/lib/invoice';
 import { saleInvoicePdf } from '@/utils/saleDocs';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatPercent } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
 import type { Sale } from '@/types';
 
@@ -139,6 +139,7 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
                       <TableHead>Product</TableHead>
                       <TableHead className="text-center">Qty</TableHead>
                       <TableHead className="text-right">Price</TableHead>
+                      <TableHead className="text-right">Discount</TableHead>
                       <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -148,6 +149,9 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
                         <TableCell className="font-medium">{it.productName}</TableCell>
                         <TableCell className="text-center">{it.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(it.salePrice, currency)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {it.discount > 0 ? (it.discountPercent ? `${formatPercent(it.discountPercent)} (${formatCurrency(it.discount, currency)})` : formatCurrency(it.discount, currency)) : '—'}
+                        </TableCell>
                         <TableCell className="text-right">{formatCurrency(Math.max(0, it.quantity * it.salePrice - it.discount), currency)}</TableCell>
                       </TableRow>
                     ))}
@@ -157,9 +161,12 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
 
               <div className="mt-4 ml-auto max-w-xs space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Sub total</span><span>{formatCurrency(sale.subTotal, currency)}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>{formatCurrency(sale.discount, currency)}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Discount{sale.discountPercent ? ` (${formatPercent(sale.discountPercent)})` : ''}</span>
+                  <span>{formatCurrency(sale.discount, currency)}</span>
+                </div>
                 <div className="flex justify-between border-t border-border pt-1 text-base font-bold"><span>Bill total</span><span>{formatCurrency(sale.totalAmount, currency)}</span></div>
-                {sale.dealerId && (
+                {sale.dealerId && previousBalance !== 0 && (
                   <>
                     <div className="flex justify-between border-t border-dashed border-border pt-1"><span className="text-muted-foreground">Previous balance</span><span>{formatCurrency(previousBalance, currency)}</span></div>
                     <div className="flex justify-between text-base font-bold"><span>Grand total payable</span><span>{formatCurrency(grandTotalDue, currency)}</span></div>

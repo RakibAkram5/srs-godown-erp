@@ -207,6 +207,7 @@ export interface SaleItem {
   pendingQuantity?: number;
   salePrice: number;
   discount: number;
+  discountPercent?: number;
   lineTotal?: number;
 }
 
@@ -220,6 +221,7 @@ export interface Sale {
   customerPhone: string | null;
   subTotal: number;
   discount: number;
+  discountPercent?: number;
   totalAmount: number;
   paidAmount: number;
   previousBalance: number;
@@ -338,12 +340,13 @@ export interface Dispatch {
   id: string;
   dispatchNo: string | null;
   saleId: string;
-  sale?: { saleNo: string | null; customerName: string | null; dealer?: { name: string } };
+  sale?: { saleNo: string | null; customerName: string | null; dealer?: { name: string; city?: string | null } };
   biltyNumber: string;
   transporterName: string;
   city: string;
   dispatchDate: string;
   notes: string | null;
+  images: string[];
   createdAt: string;
 }
 

@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import type { Sale } from '@/types';
-import { formatCurrency, formatDate } from '@/utils/formatters';
+import { formatCurrency, formatDate, formatPercent } from '@/utils/formatters';
 import { loadLogoImage } from '@/utils/logo';
 
 interface DocMeta {
@@ -61,7 +61,7 @@ export async function saleInvoicePdf(sale: Sale, meta: DocMeta) {
     it.productName,
     it.quantity,
     formatCurrency(it.salePrice, currency),
-    formatCurrency(it.discount, currency),
+    it.discount > 0 ? (it.discountPercent ? `${formatPercent(it.discountPercent)} (${formatCurrency(it.discount, currency)})` : formatCurrency(it.discount, currency)) : '—',
     formatCurrency(Math.max(0, it.quantity * it.salePrice - it.discount), currency),
   ]);
 
@@ -80,21 +80,30 @@ export async function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   const previousBalance = meta.previousBalance ?? sale.previousBalance;
   const grandTotalDue = previousBalance + sale.totalAmount;
   const balanceDue = Math.max(0, grandTotalDue - sale.paidAmount);
+  const showPreviousBalance = previousBalance !== 0;
+  const discountLabel = sale.discountPercent ? `Discount (${formatPercent(sale.discountPercent)}): ` : 'Discount: ';
 
   doc.setFontSize(10);
   doc.text(`Sub total: ${formatCurrency(sale.subTotal, currency)}`, right, endY, { align: 'right' });
-  doc.text(`Discount: ${formatCurrency(sale.discount, currency)}`, right, endY + 6, { align: 'right' });
+  doc.text(`${discountLabel}${formatCurrency(sale.discount, currency)}`, right, endY + 6, { align: 'right' });
   doc.setFontSize(11);
   doc.text(`Bill total: ${formatCurrency(sale.totalAmount, currency)}`, right, endY + 14, { align: 'right' });
   doc.setFontSize(10);
-  doc.text(`Previous balance: ${formatCurrency(previousBalance, currency)}`, right, endY + 21, { align: 'right' });
-  doc.text(`Grand total payable: ${formatCurrency(grandTotalDue, currency)}`, right, endY + 27, { align: 'right' });
-  doc.text(`Paid: ${formatCurrency(sale.paidAmount, currency)}`, right, endY + 33, { align: 'right' });
+  let y = endY + 14;
+  if (showPreviousBalance) {
+    y += 7;
+    doc.text(`Previous balance: ${formatCurrency(previousBalance, currency)}`, right, y, { align: 'right' });
+    y += 6;
+    doc.text(`Grand total payable: ${formatCurrency(grandTotalDue, currency)}`, right, y, { align: 'right' });
+  }
+  y += 6;
+  doc.text(`Paid: ${formatCurrency(sale.paidAmount, currency)}`, right, y, { align: 'right' });
+  y += 8;
   doc.setFontSize(12);
   doc.text(
     balanceDue <= 0 ? 'Balance due: Clear / Paid' : `Balance due: ${formatCurrency(balanceDue, currency)}`,
     right,
-    endY + 41,
+    y,
     { align: 'right' },
   );
 

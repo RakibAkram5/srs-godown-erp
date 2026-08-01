@@ -17,6 +17,7 @@ export function exportSalesReport(sales: Sale[], meta: ExcelMeta, filters: { lab
     { header: 'Bill No', key: 'no' },
     { header: 'Date', key: 'date' },
     { header: 'Customer', key: 'customer' },
+    { header: 'City', key: 'city' },
     { header: 'Qty', key: 'qty' },
     { header: 'Total', key: 'total', money: true },
     { header: 'Paid', key: 'paid', money: true },
@@ -26,6 +27,7 @@ export function exportSalesReport(sales: Sale[], meta: ExcelMeta, filters: { lab
   const rows = sales.map((s) => ({
     no: s.saleNo ?? '', date: formatDate(s.saleDate),
     customer: s.dealer?.name || s.customerName || 'Walk-in',
+    city: s.dealer?.city ?? '',
     qty: s.totalQuantity ?? '', total: s.totalAmount, paid: s.paidAmount,
     remaining: Math.max(0, s.totalAmount - s.paidAmount), status: s.status,
   }));

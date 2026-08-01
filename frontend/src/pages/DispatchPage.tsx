@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Pencil, Plus, Send, Trash2 } from 'lucide-react';
+import { Download, Eye, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { SearchBar } from '@/components/common/SearchBar';
 import { Pagination } from '@/components/common/Pagination';
 import { EmptyState } from '@/components/common/EmptyState';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -17,7 +18,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { DispatchFormDialog } from '@/components/dispatch/DispatchFormDialog';
+import { DispatchViewDialog } from '@/components/dispatch/DispatchViewDialog';
 import { dispatchesApi } from '@/services/dispatches.service';
+import { dealersApi } from '@/services/dealers.service';
 import { exportDispatchesExcel } from '@/utils/dispatchDocs';
 import { formatDate } from '@/utils/formatters';
 import { toast } from '@/utils/toast';
@@ -29,9 +32,11 @@ export default function DispatchPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [city, setCity] = useState('');
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Dispatch | null>(null);
+  const [viewing, setViewing] = useState<Dispatch | null>(null);
   const [deleting, setDeleting] = useState<Dispatch | null>(null);
 
   useEffect(() => {
@@ -40,9 +45,15 @@ export default function DispatchPage() {
   }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dispatches', debounced, page],
-    queryFn: () => dispatchesApi.list({ search: debounced || undefined, page, limit: PAGE_SIZE }),
+    queryKey: ['dispatches', debounced, city, page],
+    queryFn: () => dispatchesApi.list({ search: debounced || undefined, city: city || undefined, page, limit: PAGE_SIZE }),
   });
+
+  const { data: dealersForCities } = useQuery({ queryKey: ['dealers'], queryFn: () => dealersApi.list(undefined, 'active') });
+  const cities = useMemo(
+    () => Array.from(new Set((dealersForCities ?? []).map((d) => d.city).filter((c): c is string => !!c))).sort(),
+    [dealersForCities],
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => dispatchesApi.remove(id),
@@ -56,7 +67,7 @@ export default function DispatchPage() {
 
   async function handleExport() {
     try {
-      const all = await dispatchesApi.list({ search: debounced || undefined, page: 1, limit: 100000 });
+      const all = await dispatchesApi.list({ search: debounced || undefined, city: city || undefined, page: 1, limit: 100000 });
       if (all.items.length === 0) return toast.error('Nothing to export');
       exportDispatchesExcel(all.items);
       toast.success('Exported', `${all.items.length} dispatches exported.`);
@@ -81,8 +92,12 @@ export default function DispatchPage() {
         }
       />
 
-      <div className="mb-4">
-        <SearchBar value={search} onChange={setSearch} placeholder="Search bilty, transporter, city…" className="sm:max-w-sm" />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <SearchBar value={search} onChange={setSearch} placeholder="Search bilty, transporter, dealer, city…" className="sm:max-w-sm" />
+        <Select value={city} onChange={(e) => { setCity(e.target.value); setPage(1); }} className="sm:w-40">
+          <option value="">All cities</option>
+          {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+        </Select>
       </div>
 
       {isLoading ? (
@@ -103,6 +118,7 @@ export default function DispatchPage() {
                   <TableHead>Dispatch No</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Invoice</TableHead>
+                  <TableHead>Dealer/Customer</TableHead>
                   <TableHead>Bilty</TableHead>
                   <TableHead>Transporter</TableHead>
                   <TableHead>City</TableHead>
@@ -115,11 +131,15 @@ export default function DispatchPage() {
                     <TableCell className="font-medium">{d.dispatchNo}</TableCell>
                     <TableCell className="whitespace-nowrap">{formatDate(d.dispatchDate)}</TableCell>
                     <TableCell className="text-muted-foreground">{d.sale?.saleNo ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{d.sale?.dealer?.name || d.sale?.customerName || 'Walk-in'}</TableCell>
                     <TableCell>{d.biltyNumber}</TableCell>
                     <TableCell className="text-muted-foreground">{d.transporterName}</TableCell>
                     <TableCell>{d.city}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setViewing(d)} aria-label="View">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setEditing(d); setFormOpen(true); }} aria-label="Edit">
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -144,6 +164,7 @@ export default function DispatchPage() {
       )}
 
       <DispatchFormDialog open={formOpen} onOpenChange={setFormOpen} editing={editing} />
+      <DispatchViewDialog dispatch={viewing} open={!!viewing} onOpenChange={(v) => !v && setViewing(null)} />
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(v) => !v && setDeleting(null)}

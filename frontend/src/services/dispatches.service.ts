@@ -8,10 +8,12 @@ export interface DispatchPayload {
   city: string;
   dispatchDate?: string;
   notes?: string | null;
+  images?: string[];
 }
 
 export interface DispatchQuery {
   search?: string;
+  city?: string;
   page?: number;
   limit?: number;
 }

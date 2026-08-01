@@ -7,6 +7,7 @@ const dispatchBody = z.object({
   city: z.string().trim().min(1, 'City is required'),
   dispatchDate: z.coerce.date().optional(),
   notes: z.string().trim().optional().or(z.literal('')).nullable(),
+  images: z.array(z.string()).max(5, 'Max 5 images').default([]),
 });
 
 export const createDispatchSchema = z.object({ body: dispatchBody });

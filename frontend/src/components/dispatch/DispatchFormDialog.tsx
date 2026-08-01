@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ImagePlus, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,9 @@ import { dispatchesApi, type DispatchPayload } from '@/services/dispatches.servi
 import type { Dispatch } from '@/types';
 import { toast } from '@/utils/toast';
 
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // 2 MB per image
+const MAX_IMAGES = 5;
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +37,7 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId, editing }
   const [city, setCity] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [images, setImages] = useState<string[]>([]);
 
   const { data: sales } = useQuery({
     queryKey: ['sales-completed'],
@@ -46,18 +51,44 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId, editing }
         setSaleId(editing.saleId);
         setBiltyNumber(editing.biltyNumber); setTransporterName(editing.transporterName); setCity(editing.city);
         setDate(editing.dispatchDate.slice(0, 10)); setNotes(editing.notes ?? '');
+        setImages(editing.images ?? []);
       } else {
         setSaleId(presetSaleId ?? '');
         setBiltyNumber(''); setTransporterName(''); setCity('');
         setDate(new Date().toISOString().slice(0, 10));
-        setNotes('');
+        setNotes(''); setImages([]);
       }
     }
   }, [open, presetSaleId, editing]);
 
+  function pickImages(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) {
+      toast.error('Limit reached', `You can attach up to ${MAX_IMAGES} images.`);
+      return;
+    }
+    Array.from(files).slice(0, remaining).forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Invalid file', `"${file.name}" isn't an image.`);
+        return;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        toast.error('Image too large', `"${file.name}" is over 2 MB.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => setImages((prev) => (prev.length < MAX_IMAGES ? [...prev, reader.result as string] : prev));
+      reader.readAsDataURL(file);
+    });
+  }
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
   const mutation = useMutation({
     mutationFn: () => {
-      const payload: DispatchPayload = { saleId, biltyNumber, transporterName, city, dispatchDate: date, notes: notes || null };
+      const payload: DispatchPayload = { saleId, biltyNumber, transporterName, city, dispatchDate: date, notes: notes || null, images };
       return editing ? dispatchesApi.update(editing.id, payload) : dispatchesApi.create(payload);
     },
     onSuccess: () => {
@@ -117,6 +148,33 @@ export function DispatchFormDialog({ open, onOpenChange, presetSaleId, editing }
           <div className="space-y-2">
             <Label htmlFor="dnotes">Notes</Label>
             <Textarea id="dnotes" rows={2} placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Bilty images</Label>
+            <div className="flex flex-wrap gap-2">
+              {images.map((src, i) => (
+                <div key={i} className="group relative h-16 w-16 overflow-hidden rounded-md border border-border">
+                  <img src={src} alt={`Bilty ${i + 1}`} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute right-0.5 top-0.5 rounded-full bg-background/90 p-0.5 text-destructive opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              {images.length < MAX_IMAGES && (
+                <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary">
+                  <ImagePlus className="h-5 w-5" />
+                  <span className="text-[10px]">Add</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { pickImages(e.target.files); e.target.value = ''; }} />
+                </label>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Up to {MAX_IMAGES} images, 2 MB each.</p>
           </div>
         </div>
 

@@ -19,28 +19,46 @@ interface PreparedItem {
   quantity: number;
   salePrice: number;
   discount: number;
+  discountPercent: number;
   lineTotal: number;
 }
 
+// Discount is entered as a percentage but stored as both — the fixed
+// `discount` amount keeps its historical meaning (used by complete()'s
+// pending-quantity proration and everywhere totals are read), while
+// `discountPercent` is only for re-populating the edit form and display.
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
 function computeTotals(input: SaleInput) {
-  const items: PreparedItem[] = input.items.map((it) => ({
-    productId: it.productId,
-    productName: it.productName,
-    quantity: it.quantity,
-    salePrice: it.salePrice,
-    discount: it.discount ?? 0,
-    lineTotal: Math.max(0, it.quantity * it.salePrice - (it.discount ?? 0)),
-  }));
+  const items: PreparedItem[] = input.items.map((it) => {
+    const percent = it.discountPercent ?? 0;
+    const gross = it.quantity * it.salePrice;
+    const discount = round2(gross * (percent / 100));
+    return {
+      productId: it.productId,
+      productName: it.productName,
+      quantity: it.quantity,
+      salePrice: it.salePrice,
+      discount,
+      discountPercent: percent,
+      lineTotal: Math.max(0, gross - discount),
+    };
+  });
 
   const subTotal = items.reduce((s, it) => s + it.lineTotal, 0);
-  const totalAmount = Math.max(0, subTotal - (input.discount ?? 0));
+  const overallPercent = input.discountPercent ?? 0;
+  const overallDiscount = round2(subTotal * (overallPercent / 100));
+  const totalAmount = Math.max(0, subTotal - overallDiscount);
 
-  return { items, subTotal, totalAmount };
+  return { items, subTotal, totalAmount, discount: overallDiscount, discountPercent: overallPercent };
 }
 
 export interface SaleListQuery {
   search?: string;
   status?: string;
+  city?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: string;
@@ -65,6 +83,7 @@ export const saleService = {
       ];
     }
     if (query.status === 'DRAFT' || query.status === 'COMPLETED') where.status = query.status;
+    if (query.city) where.dealer = { city: { equals: query.city, mode: 'insensitive' } };
     if (query.dateFrom || query.dateTo) {
       where.saleDate = {};
       if (query.dateFrom) where.saleDate.gte = new Date(query.dateFrom);
@@ -94,7 +113,7 @@ export const saleService = {
   },
 
   async create(input: SaleInput) {
-    const { items, subTotal, totalAmount } = computeTotals(input);
+    const { items, subTotal, totalAmount, discount, discountPercent } = computeTotals(input);
 
     const created = await prisma.sale.create({
       data: {
@@ -103,7 +122,8 @@ export const saleService = {
         customerPhone: clean(input.customerPhone),
         saleDate: input.saleDate ?? new Date(),
         subTotal,
-        discount: input.discount ?? 0,
+        discount,
+        discountPercent,
         totalAmount,
         paidAmount: Math.max(0, input.paidAmount ?? 0),
         notes: clean(input.notes),
@@ -126,7 +146,7 @@ export const saleService = {
     if (existing.status === 'COMPLETED') {
       throw ApiError.badRequest('Completed sales cannot be edited. Create a return instead.');
     }
-    const { items, subTotal, totalAmount } = computeTotals(input);
+    const { items, subTotal, totalAmount, discount, discountPercent } = computeTotals(input);
 
     await prisma.$transaction(async (tx) => {
       await tx.saleItem.deleteMany({ where: { saleId: id } });
@@ -138,7 +158,8 @@ export const saleService = {
           customerPhone: clean(input.customerPhone),
           saleDate: input.saleDate ?? existing.saleDate,
           subTotal,
-          discount: input.discount ?? 0,
+          discount,
+          discountPercent,
           totalAmount,
           paidAmount: Math.max(0, input.paidAmount ?? 0),
           notes: clean(input.notes),

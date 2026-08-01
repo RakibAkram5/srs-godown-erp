@@ -14,6 +14,7 @@ function clean(v?: string | null) {
 
 export interface DispatchListQuery {
   search?: string;
+  city?: string;
   page?: number;
   limit?: number;
 }
@@ -30,8 +31,11 @@ export const dispatchService = {
         { biltyNumber: { contains: s, mode: 'insensitive' } },
         { transporterName: { contains: s, mode: 'insensitive' } },
         { city: { contains: s, mode: 'insensitive' } },
+        { sale: { customerName: { contains: s, mode: 'insensitive' } } },
+        { sale: { dealer: { name: { contains: s, mode: 'insensitive' } } } },
       ];
     }
+    if (query.city) where.city = { equals: query.city, mode: 'insensitive' };
     const [items, total] = await Promise.all([
       dispatchRepository.findMany(where, (page - 1) * limit, limit),
       dispatchRepository.count(where),
@@ -51,12 +55,13 @@ export const dispatchService = {
         city: input.city.trim(),
         dispatchDate: input.dispatchDate ?? new Date(),
         notes: clean(input.notes),
+        images: input.images ?? [],
       },
     });
     return prisma.dispatch.update({
       where: { id: created.id },
       data: { dispatchNo: `DSP-${pad(created.codeNo)}` },
-      include: { sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true } } } } },
+      include: { sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true, city: true } } } } },
     });
   },
 
@@ -74,8 +79,9 @@ export const dispatchService = {
         city: input.city.trim(),
         dispatchDate: input.dispatchDate ?? existing.dispatchDate,
         notes: clean(input.notes),
+        images: input.images ?? existing.images,
       },
-      include: { sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true } } } } },
+      include: { sale: { select: { saleNo: true, customerName: true, dealer: { select: { name: true, city: true } } } } },
     });
   },
 

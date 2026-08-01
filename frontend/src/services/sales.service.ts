@@ -6,7 +6,7 @@ export interface SaleItemPayload {
   productName: string;
   quantity: number;
   salePrice: number;
-  discount?: number;
+  discountPercent?: number;
 }
 
 export interface SalePayload {
@@ -14,7 +14,7 @@ export interface SalePayload {
   customerName?: string | null;
   customerPhone?: string | null;
   saleDate?: string;
-  discount?: number;
+  discountPercent?: number;
   paidAmount?: number;
   notes?: string | null;
   status: 'DRAFT' | 'COMPLETED';
@@ -24,6 +24,7 @@ export interface SalePayload {
 export interface SaleQuery {
   search?: string;
   status?: string;
+  city?: string;
   dateFrom?: string;
   dateTo?: string;
   sortBy?: string;
