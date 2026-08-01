@@ -144,6 +144,21 @@
   }
 }
 
+/* ── Bordered invoice item table — every cell, screen + print ─ */
+.invoice-table,
+.invoice-table th,
+.invoice-table td {
+  border: 1px solid hsl(var(--border));
+  border-collapse: collapse;
+}
+.invoice-table {
+  border-collapse: collapse;
+}
+.invoice-table th,
+.invoice-table td {
+  padding: 8px 12px;
+}
+
 /* ── Invoice print tuning (Phase 7) ───────────────────── */
 @page {
   size: A4;

@@ -17,7 +17,9 @@ router.get('/pending', adminOnly, saleController.listPending);
 router.post('/items/:itemId/fulfill', adminOnly, saleController.fulfillItem);
 
 router.get('/', saleController.list);
-router.post('/', validate(createSaleSchema), saleController.create);
+// Creating a new invoice is admin-only; editing/deleting existing ones stays
+// available to anyone with the sales permission (unchanged from before).
+router.post('/', adminOnly, validate(createSaleSchema), saleController.create);
 router.get('/:id', saleController.get);
 router.put('/:id', validate(updateSaleSchema), saleController.update);
 router.post('/:id/complete', saleController.complete);

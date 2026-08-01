@@ -133,22 +133,24 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
               </div>
 
               <div className="mt-4 overflow-x-auto">
-                <Table>
+                <Table className="invoice-table">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product</TableHead>
+                      <TableHead className="text-center">Sr. No.</TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
                       <TableHead className="text-center">Qty</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
                       <TableHead className="text-right">Discount</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Total Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(sale.items ?? []).map((it) => (
+                    {(sale.items ?? []).map((it, idx) => (
                       <TableRow key={it.id ?? it.productId}>
+                        <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="font-medium">{it.productName}</TableCell>
-                        <TableCell className="text-center">{it.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(it.salePrice, currency)}</TableCell>
+                        <TableCell className="text-center">{it.quantity}</TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {it.discount > 0 ? (it.discountPercent ? `${formatPercent(it.discountPercent)} (${formatCurrency(it.discount, currency)})` : formatCurrency(it.discount, currency)) : '—'}
                         </TableCell>

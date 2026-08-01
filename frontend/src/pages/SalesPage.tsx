@@ -186,7 +186,9 @@ export default function SalesPage() {
           tab === 'sales' ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4" />Export</Button>
-              <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />New Sale</Button>
+              {admin && (
+                <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />New Sale</Button>
+              )}
             </div>
           ) : undefined
         }
@@ -226,7 +228,12 @@ export default function SalesPage() {
           {salesQuery.isLoading ? (
             <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>
           ) : !sales || sales.items.length === 0 ? (
-            <EmptyState icon={ReceiptText} title="No sales found" description="Create your first sale to reduce stock." action={<Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New Sale</Button>} />
+            <EmptyState
+              icon={ReceiptText}
+              title="No sales found"
+              description={admin ? 'Create your first sale to reduce stock.' : 'No sales have been recorded yet.'}
+              action={admin ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New Sale</Button> : undefined}
+            />
           ) : (
             <div className="rounded-lg border border-border">
               <div className="overflow-x-auto scrollbar-thin">
@@ -394,7 +401,12 @@ export default function SalesPage() {
       )}
 
       {/* Dialogs */}
-      <SaleFormDialog open={formOpen} onOpenChange={setFormOpen} sale={editing} />
+      <SaleFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        sale={editing}
+        onSaved={(saved) => setViewingId(saved.id)}
+      />
       <SaleViewDialog
         saleId={viewingId}
         open={!!viewingId}

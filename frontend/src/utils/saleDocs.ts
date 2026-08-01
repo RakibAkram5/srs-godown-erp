@@ -59,19 +59,19 @@ export async function saleInvoicePdf(sale: Sale, meta: DocMeta) {
   const body = (sale.items ?? []).map((it, i) => [
     i + 1,
     it.productName,
-    it.quantity,
     formatCurrency(it.salePrice, currency),
+    it.quantity,
     it.discount > 0 ? (it.discountPercent ? `${formatPercent(it.discountPercent)} (${formatCurrency(it.discount, currency)})` : formatCurrency(it.discount, currency)) : '—',
     formatCurrency(Math.max(0, it.quantity * it.salePrice - it.discount), currency),
   ]);
 
   autoTable(doc, {
     startY: infoY + 4,
-    head: [['#', 'Product', 'Qty', 'Price', 'Discount', 'Total']],
+    head: [['Sr. No.', 'Item Name', 'Rate', 'Qty', 'Discount', 'Total Amount']],
     body,
-    theme: 'striped',
+    theme: 'grid',
     headStyles: { fillColor: [37, 99, 235] },
-    styles: { fontSize: 9 },
+    styles: { fontSize: 9, lineWidth: 0.1, lineColor: [200, 200, 200] },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

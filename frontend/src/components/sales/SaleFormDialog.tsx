@@ -36,6 +36,9 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sale?: Sale | null;
+  // Called with the freshly created/updated sale right after a successful save,
+  // so the caller can jump straight to viewing/printing it without extra navigation.
+  onSaved?: (sale: Sale) => void;
 }
 
 const emptyRow: Row = { productId: '', productName: '', quantity: 1, salePrice: 0, discountPercent: 0, available: 0 };
@@ -49,7 +52,7 @@ function derivePercent(discountPercent: number | undefined, discount: number, gr
   return 0;
 }
 
-export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
+export function SaleFormDialog({ open, onOpenChange, sale, onSaved }: Props) {
   const queryClient = useQueryClient();
   const editing = !!sale;
 
@@ -177,6 +180,9 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
         toast.success(variables.status === 'COMPLETED' ? 'Sale completed — stock updated' : 'Sale saved as draft');
       }
       onOpenChange(false);
+      // Only auto-open the invoice for brand-new sales — jumping straight to
+      // print without extra navigation. Repeated edits shouldn't keep popping it.
+      if (!editing) onSaved?.(data);
     },
     onError: (err: Error) => toast.error('Could not save sale', err.message),
   });
