@@ -1,4 +1,4 @@
 {
-  "buildCommand": "npm run typecheck && npx prisma migrate deploy",
+  "buildCommand": "npm run build && npx prisma migrate deploy",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }
