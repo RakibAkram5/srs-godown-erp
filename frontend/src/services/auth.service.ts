@@ -50,6 +50,14 @@ export const authService = {
     return unwrap<null>(api.put('/auth/change-password', payload));
   },
 
+  forgotPassword(username: string): Promise<null> {
+    return unwrap<null>(api.post('/auth/forgot-password', { username }));
+  },
+
+  resetPasswordWithOtp(username: string, otp: string, newPassword: string): Promise<null> {
+    return unwrap<null>(api.post('/auth/reset-password', { username, otp, newPassword }));
+  },
+
   getLoginHistory(): Promise<LoginHistoryEntry[]> {
     return unwrap<LoginHistoryEntry[]>(api.get('/auth/login-history'));
   },

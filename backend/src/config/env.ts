@@ -40,4 +40,10 @@ export const env = {
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
     max: Number(process.env.RATE_LIMIT_MAX ?? 300),
   },
+
+  // Forgot-password OTP emails. Optional in dev — if unset, the OTP is just
+  // logged to the console instead of emailed, so local login-recovery testing
+  // doesn't require a Resend account.
+  resendApiKey: process.env.RESEND_API_KEY,
+  resendFromEmail: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
 } as const;

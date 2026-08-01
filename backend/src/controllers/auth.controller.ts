@@ -64,4 +64,15 @@ export const authController = {
     const logs = await authService.listAuditLog(req.user.sub);
     return sendSuccess(res, logs);
   }),
+
+  forgotPassword: asyncHandler(async (req: Request, res: Response) => {
+    await authService.forgotPassword(req.body, contextOf(req));
+    // Same response whether or not the username exists — avoids leaking valid accounts.
+    return sendSuccess(res, null, 'If that account exists, a reset code has been emailed to it.');
+  }),
+
+  resetPasswordWithOtp: asyncHandler(async (req: Request, res: Response) => {
+    await authService.resetPasswordWithOtp(req.body, contextOf(req));
+    return sendSuccess(res, null, 'Password reset successfully. You can now sign in.');
+  }),
 };

@@ -36,6 +36,8 @@ enum AuditAction {
   USER_UPDATE
   USER_DELETE
   PASSWORD_RESET
+  PASSWORD_RESET_OTP_REQUESTED
+  PASSWORD_RESET_OTP_COMPLETED
   BALANCE_ADJUSTMENT
   SETTINGS_UPDATE
 }
@@ -57,12 +59,28 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  refreshTokens RefreshToken[]
-  loginHistory  LoginHistory[]
-  auditLogs     AuditLog[]
-  salaries      Salary[]
+  refreshTokens     RefreshToken[]
+  loginHistory      LoginHistory[]
+  auditLogs         AuditLog[]
+  salaries          Salary[]
+  passwordResetOtps PasswordResetOtp[]
 
   @@map("users")
+}
+
+// Forgot-password OTP — short-lived, single-use, stored hashed (never plaintext).
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash   String   @map("otp_hash")
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_reset_otps")
 }
 
 // Hashed refresh tokens — enables revocation on logout / password change.

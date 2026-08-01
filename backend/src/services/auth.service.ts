@@ -3,6 +3,7 @@ import { userRepository } from '@/repositories/user.repository';
 import { refreshTokenRepository } from '@/repositories/refreshToken.repository';
 import { loginHistoryRepository } from '@/repositories/loginHistory.repository';
 import { auditLogRepository } from '@/repositories/auditLog.repository';
+import { passwordResetOtpRepository } from '@/repositories/passwordResetOtp.repository';
 import { comparePassword, hashPassword } from '@/utils/password';
 import {
   signAccessToken,
@@ -14,7 +15,16 @@ import {
 import { sha256 } from '@/utils/hash';
 import { parseUserAgent } from '@/utils/userAgent';
 import { ApiError } from '@/utils/apiError';
-import type { LoginInput, UpdateProfileInput } from '@/validators/auth.validator';
+import { sendOtpEmail } from '@/utils/email';
+import { settingsService } from '@/services/settings.service';
+import type { LoginInput, UpdateProfileInput, ForgotPasswordInput, ResetPasswordWithOtpInput } from '@/validators/auth.validator';
+
+const OTP_EXPIRY_MINUTES = 10;
+const MAX_OTP_ATTEMPTS = 5;
+
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export interface RequestContext {
   ipAddress?: string;
@@ -221,5 +231,60 @@ export const authService = {
 
   listAuditLog(userId: string) {
     return auditLogRepository.listForUser(userId);
+  },
+
+  // Always resolves the same way whether or not the username exists, so the
+  // response can't be used to enumerate valid accounts.
+  async forgotPassword(input: ForgotPasswordInput, ctx: RequestContext) {
+    const user = await userRepository.findByUsername(input.username);
+    if (!user || !user.isActive) return;
+
+    const otp = generateOtp();
+    await passwordResetOtpRepository.invalidateAllForUser(user.id);
+    await passwordResetOtpRepository.create({
+      userId: user.id,
+      otpHash: sha256(otp),
+      expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000),
+    });
+
+    const { companyName } = await settingsService.getBranding();
+    await sendOtpEmail(user.email, otp, companyName);
+
+    await auditLogRepository.create({
+      userId: user.id,
+      action: AuditAction.PASSWORD_RESET_OTP_REQUESTED,
+      detail: `Password reset code sent to ${user.email}`,
+      ipAddress: ctx.ipAddress,
+    });
+  },
+
+  async resetPasswordWithOtp(input: ResetPasswordWithOtpInput, ctx: RequestContext) {
+    const user = await userRepository.findByUsername(input.username);
+    const genericError = () => ApiError.badRequest('Invalid or expired code');
+    if (!user) throw genericError();
+
+    const record = await passwordResetOtpRepository.findLatestValid(user.id);
+    if (!record) throw genericError();
+    if (record.attempts >= MAX_OTP_ATTEMPTS) {
+      throw ApiError.badRequest('Too many incorrect attempts. Request a new code.');
+    }
+
+    if (sha256(input.otp) !== record.otpHash) {
+      await passwordResetOtpRepository.incrementAttempts(record.id);
+      throw genericError();
+    }
+
+    await passwordResetOtpRepository.markUsed(record.id);
+    const hashed = await hashPassword(input.newPassword);
+    await userRepository.updatePassword(user.id, hashed);
+    await userRepository.resetFailedAttempts(user.id);
+    await refreshTokenRepository.revokeAllForUser(user.id);
+
+    await auditLogRepository.create({
+      userId: user.id,
+      action: AuditAction.PASSWORD_RESET_OTP_COMPLETED,
+      detail: 'Password reset via emailed OTP',
+      ipAddress: ctx.ipAddress,
+    });
   },
 };

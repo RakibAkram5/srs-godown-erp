@@ -17,3 +17,13 @@ export const authRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many login attempts, please wait a while.' },
 });
+
+/* Tighter limit for OTP endpoints — each request sends an email and each
+ * verification is a guessing attempt, so both need to be rate-limited hard. */
+export const otpRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many attempts, please wait a while.' },
+});

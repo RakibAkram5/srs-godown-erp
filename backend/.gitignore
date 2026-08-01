@@ -4,3 +4,6 @@ dist
 *.log
 prisma/dev.db
 coverage
+
+.vercel
+.env*

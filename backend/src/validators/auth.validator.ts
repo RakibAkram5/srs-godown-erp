@@ -46,7 +46,23 @@ export const changePasswordSchema = z.object({
     }),
 });
 
+export const forgotPasswordSchema = z.object({
+  body: z.object({
+    username: z.string().trim().min(1, 'Username is required'),
+  }),
+});
+
+export const resetPasswordWithOtpSchema = z.object({
+  body: z.object({
+    username: z.string().trim().min(1, 'Username is required'),
+    otp: z.string().trim().length(6, 'Enter the 6-digit code'),
+    newPassword: strongPassword,
+  }),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>['body'];
 export type RefreshInput = z.infer<typeof refreshSchema>['body'];
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>['body'];
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>['body'];
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>['body'];
+export type ResetPasswordWithOtpInput = z.infer<typeof resetPasswordWithOtpSchema>['body'];

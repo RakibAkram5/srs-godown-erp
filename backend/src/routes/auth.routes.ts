@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { authController } from '@/controllers/auth.controller';
 import { validate } from '@/middlewares/validate.middleware';
 import { authenticate } from '@/middlewares/auth.middleware';
-import { authRateLimiter } from '@/middlewares/rateLimiter';
+import { authRateLimiter, otpRateLimiter } from '@/middlewares/rateLimiter';
 import {
   loginSchema,
   refreshSchema,
   updateProfileSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordWithOtpSchema,
 } from '@/validators/auth.validator';
 
 const router = Router();
@@ -15,6 +17,8 @@ const router = Router();
 // ── Public ────────────────────────────────────────────
 router.post('/login', authRateLimiter, validate(loginSchema), authController.login);
 router.post('/refresh', authRateLimiter, validate(refreshSchema), authController.refresh);
+router.post('/forgot-password', otpRateLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/reset-password', otpRateLimiter, validate(resetPasswordWithOtpSchema), authController.resetPasswordWithOtp);
 
 // ── Authenticated ─────────────────────────────────────
 router.post('/logout', authenticate, authController.logout);
