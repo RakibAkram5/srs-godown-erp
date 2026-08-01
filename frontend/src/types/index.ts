@@ -158,6 +158,7 @@ export interface Purchase {
   items?: PurchaseItem[];
   _count?: { items: number };
   createdAt: string;
+  autoFulfilled?: FulfillmentSummary[];
 }
 
 export interface PurchaseListResult {
@@ -229,6 +230,14 @@ export interface Sale {
   items?: SaleItem[];
   _count?: { items: number };
   createdAt: string;
+  shortages?: { productName: string; pendingQuantity: number }[];
+}
+
+export interface FulfillmentSummary {
+  id: string;
+  saleNo: string | null;
+  totalAmount: number;
+  recipientName: string;
 }
 
 export interface SaleListResult {

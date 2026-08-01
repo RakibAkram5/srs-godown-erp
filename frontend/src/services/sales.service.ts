@@ -1,5 +1,5 @@
 import { api, unwrap } from './api';
-import type { PendingItem, Sale, SaleListResult, SaleReturn } from '@/types';
+import type { FulfillmentSummary, PendingItem, Sale, SaleListResult, SaleReturn } from '@/types';
 
 export interface SaleItemPayload {
   productId: string;
@@ -73,7 +73,10 @@ export const salesApi = {
   listPending(): Promise<PendingItem[]> {
     return unwrap<PendingItem[]>(api.get('/sales/pending'));
   },
-  fulfillItem(itemId: string, quantity?: number): Promise<{ fulfilled: number; remaining: number }> {
+  fulfillItem(
+    itemId: string,
+    quantity?: number,
+  ): Promise<{ fulfilled: number; remaining: number; newSale: FulfillmentSummary }> {
     return unwrap(api.post(`/sales/items/${itemId}/fulfill`, quantity ? { quantity } : {}));
   },
 };

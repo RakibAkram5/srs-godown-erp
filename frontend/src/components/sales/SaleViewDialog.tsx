@@ -57,11 +57,19 @@ export function SaleViewDialog({ saleId, open, onOpenChange, onEdit, onReturn }:
 
   const completeMutation = useMutation({
     mutationFn: () => salesApi.complete(sale!.id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Sale completed — stock updated');
+      if (data.shortages && data.shortages.length > 0) {
+        toast.error(
+          'Stock kam hai — kuch items pending',
+          data.shortages.map((s) => `${s.productName}: ${s.pendingQuantity} pending`).join(', ') +
+            ' — stock daaliye, invoice khud ban jayega.',
+        );
+      } else {
+        toast.success('Sale completed — stock updated');
+      }
     },
     onError: (err: Error) => toast.error('Could not complete', err.message),
   });

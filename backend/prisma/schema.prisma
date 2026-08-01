@@ -4,7 +4,8 @@
 // No business tables yet — those belong to future phases.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -382,6 +383,7 @@ model SaleItem {
   productName     String @map("product_name")
   quantity        Int
   pendingQuantity Int    @default(0) @map("pending_quantity")
+  pendingDiscount Float  @default(0) @map("pending_discount")
   salePrice       Float  @map("sale_price")
   discount        Float  @default(0)
   lineTotal       Float  @map("line_total")

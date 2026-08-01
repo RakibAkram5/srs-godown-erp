@@ -147,11 +147,20 @@ export function PurchaseFormDialog({ open, onOpenChange, purchase }: Props) {
       };
       return editing ? purchasesApi.update(purchase!.id, payload) : purchasesApi.create(payload);
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
-      toast.success(variables.status === 'COMPLETED' ? 'Purchase completed — stock updated' : 'Purchase saved as draft');
+      if (data.autoFulfilled && data.autoFulfilled.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['dealers'] });
+        toast.success(
+          'Pending invoice(s) auto-generated',
+          data.autoFulfilled.map((f) => `${f.saleNo} — ${f.recipientName} (Rs ${f.totalAmount.toLocaleString()})`).join(', '),
+        );
+      } else {
+        toast.success(variables.status === 'COMPLETED' ? 'Purchase completed — stock updated' : 'Purchase saved as draft');
+      }
       onOpenChange(false);
     },
     onError: (err: Error) => toast.error('Could not save purchase', err.message),

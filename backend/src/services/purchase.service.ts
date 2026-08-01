@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/config/prisma';
 import { purchaseRepository } from '@/repositories/purchase.repository';
 import { ApiError } from '@/utils/apiError';
+import { autoFulfillPendingForProduct, type FulfillmentSummary } from '@/services/pendingFulfillment.service';
 import type { PurchaseInput, ReturnInput } from '@/validators/purchase.validator';
 
 function pad(n: number, len = 5): string {
@@ -114,7 +115,7 @@ export const purchaseService = {
       data: { purchaseNo: `PUR-${pad(created.codeNo)}` },
     });
 
-    if (input.status === 'COMPLETED') await this.complete(created.id);
+    if (input.status === 'COMPLETED') return this.complete(created.id);
     return this.get(created.id);
   },
 
@@ -146,16 +147,20 @@ export const purchaseService = {
       });
     });
 
-    if (input.status === 'COMPLETED') await this.complete(id);
+    if (input.status === 'COMPLETED') return this.complete(id);
     return this.get(id);
   },
 
   // Apply stock inward, update vendor balance, record movements. DRAFT → COMPLETED.
+  // Once each product's stock is topped up, checks whether any dealers/customers
+  // are waiting on a backordered (pending) sale for it and auto-bills them.
   async complete(id: string) {
     const purchase = await purchaseRepository.findById(id);
     if (!purchase) throw ApiError.notFound('Purchase not found');
     if (purchase.status === 'COMPLETED') throw ApiError.badRequest('Purchase is already completed');
     if (purchase.items.length === 0) throw ApiError.badRequest('Add at least one product before completing');
+
+    const autoFulfilled: FulfillmentSummary[] = [];
 
     await prisma.$transaction(async (tx) => {
       for (const item of purchase.items) {
@@ -185,6 +190,8 @@ export const purchaseService = {
             referenceNo: purchase.purchaseNo,
           },
         });
+
+        autoFulfilled.push(...(await autoFulfillPendingForProduct(tx, item.productId)));
       }
       const vendor = await tx.vendor.findUnique({ where: { id: purchase.vendorId } });
       const previousBalance = vendor?.balance ?? 0;
@@ -196,7 +203,7 @@ export const purchaseService = {
       await tx.purchase.update({ where: { id: purchase.id }, data: { status: 'COMPLETED', previousBalance } });
     });
 
-    return this.get(id);
+    return { ...(await this.get(id)), autoFulfilled };
   },
 
   async remove(id: string) {

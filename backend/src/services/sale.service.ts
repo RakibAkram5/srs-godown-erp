@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/config/prisma';
 import { saleRepository } from '@/repositories/sale.repository';
 import { ApiError } from '@/utils/apiError';
+import { createFulfillmentSale } from '@/services/pendingFulfillment.service';
 import type { SaleInput, SaleReturnInput } from '@/validators/sale.validator';
 
 function pad(n: number, len = 5): string {
@@ -116,7 +117,7 @@ export const saleService = {
       data: { saleNo: `SAL-${pad(created.codeNo)}` },
     });
 
-    if (input.status === 'COMPLETED') await this.complete(created.id);
+    if (input.status === 'COMPLETED') return this.complete(created.id);
     return this.get(created.id);
   },
 
@@ -146,18 +147,24 @@ export const saleService = {
       });
     });
 
-    if (input.status === 'COMPLETED') await this.complete(id);
+    if (input.status === 'COMPLETED') return this.complete(id);
     return this.get(id);
   },
 
   // Apply stock OUTWARD (with stock check). DRAFT → COMPLETED.
+  // Only what's actually in stock gets billed on this invoice — any shortfall
+  // is recorded as pending (against the dealer) and billed later, once stock
+  // arrives, as its own invoice (see pendingFulfillment.service.ts).
   async complete(id: string) {
     const sale = await saleRepository.findById(id);
     if (!sale) throw ApiError.notFound('Sale not found');
     if (sale.status === 'COMPLETED') throw ApiError.badRequest('Sale is already completed');
     if (sale.items.length === 0) throw ApiError.badRequest('Add at least one product before completing');
 
+    const shortages: { productName: string; pendingQuantity: number }[] = [];
+
     await prisma.$transaction(async (tx) => {
+      let subTotal = 0;
       for (const item of sale.items) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product || product.isDeleted) {
@@ -166,6 +173,14 @@ export const saleService = {
         // Fulfill as much as stock allows; the rest becomes pending.
         const fulfill = Math.max(0, Math.min(item.quantity, product.currentStock));
         const pending = item.quantity - fulfill;
+
+        // Prorate the line's discount between the delivered and pending portions,
+        // so only the delivered part is billed now and the rest is billed correctly
+        // once it's fulfilled.
+        const discountPerUnit = item.quantity > 0 ? item.discount / item.quantity : 0;
+        const billedDiscount = discountPerUnit * fulfill;
+        const pendingDiscount = discountPerUnit * pending;
+        const billedLineTotal = Math.max(0, fulfill * item.salePrice - billedDiscount);
 
         if (fulfill > 0) {
           const newStock = product.currentStock - fulfill;
@@ -183,19 +198,37 @@ export const saleService = {
             },
           });
         }
-        await tx.saleItem.update({ where: { id: item.id }, data: { pendingQuantity: pending } });
+        if (pending > 0) shortages.push({ productName: item.productName, pendingQuantity: pending });
+
+        await tx.saleItem.update({
+          where: { id: item.id },
+          data: {
+            quantity: fulfill,
+            discount: billedDiscount,
+            lineTotal: billedLineTotal,
+            pendingQuantity: pending,
+            pendingDiscount,
+          },
+        });
+        subTotal += billedLineTotal;
       }
+
+      const totalAmount = Math.max(0, subTotal - sale.discount);
+
       let previousBalance = 0;
       if (sale.dealerId) {
         const dealer = await tx.dealer.findUnique({ where: { id: sale.dealerId } });
         previousBalance = dealer?.balance ?? 0;
-        const unpaid = sale.totalAmount - sale.paidAmount; // only the remaining goes to outstanding
+        const unpaid = totalAmount - sale.paidAmount; // only the remaining goes to outstanding
         await tx.dealer.update({ where: { id: sale.dealerId }, data: { balance: { increment: unpaid } } });
       }
-      await tx.sale.update({ where: { id: sale.id }, data: { status: 'COMPLETED', previousBalance } });
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { status: 'COMPLETED', previousBalance, subTotal, totalAmount },
+      });
     });
 
-    return this.get(id);
+    return { ...(await this.get(id)), shortages };
   },
 
   async remove(id: string) {
@@ -218,8 +251,10 @@ export const saleService = {
 
     await prisma.$transaction(async (tx) => {
       // Put delivered stock back and log a reversing movement.
+      // (`quantity` already holds only the delivered amount — `complete()` reduces it
+      // to that, separately from `pendingQuantity` which tracks any open backorder.)
       for (const item of sale.items) {
-        const delivered = item.quantity - item.pendingQuantity;
+        const delivered = item.quantity;
         if (delivered > 0) {
           const product = await tx.product.findUnique({ where: { id: item.productId } });
           if (product) {
@@ -373,9 +408,14 @@ export const saleService = {
     }));
   },
 
-  // Fulfill (dispatch) part or all of a pending sale item, deducting stock.
+  // Fulfill (dispatch) part or all of a pending sale item — deducts stock AND
+  // bills the recipient for it via a brand-new invoice (the original invoice
+  // never included this shortfall in the first place).
   async fulfillItem(itemId: string, requestedQty?: number) {
-    const item = await prisma.saleItem.findUnique({ where: { id: itemId }, include: { sale: true } });
+    const item = await prisma.saleItem.findUnique({
+      where: { id: itemId },
+      include: { sale: { include: { dealer: true } } },
+    });
     if (!item) throw ApiError.notFound('Sale item not found');
     if (item.sale.status !== 'COMPLETED') throw ApiError.badRequest('Only completed sales can be fulfilled');
     if (item.pendingQuantity <= 0) throw ApiError.badRequest('Nothing pending on this item');
@@ -388,25 +428,22 @@ export const saleService = {
     const qty = requestedQty && requestedQty > 0 ? Math.min(requestedQty, cap) : cap;
     if (qty <= 0) throw ApiError.badRequest('Nothing to fulfill');
 
-    await prisma.$transaction(async (tx) => {
-      const newStock = product.currentStock - qty;
-      await tx.product.update({ where: { id: product.id }, data: { currentStock: newStock } });
-      await tx.stockMovement.create({
-        data: {
-          productId: product.id,
-          productName: product.name,
-          type: 'SALE_OUT',
-          quantity: -qty,
-          balanceAfter: newStock,
-          referenceType: 'SALE',
-          referenceId: item.sale.id,
-          referenceNo: item.sale.saleNo,
-          note: 'Pending fulfilled',
+    const remainingBefore = item.pendingQuantity;
+    const recipientName = item.sale.dealer?.name ?? item.sale.customerName ?? 'Walk-in';
+    const newSale = await prisma.$transaction((tx) =>
+      createFulfillmentSale(
+        tx,
+        {
+          dealerId: item.sale.dealerId,
+          customerName: item.sale.customerName,
+          customerPhone: item.sale.customerPhone,
+          recipientName,
         },
-      });
-      await tx.saleItem.update({ where: { id: item.id }, data: { pendingQuantity: item.pendingQuantity - qty } });
-    });
+        [{ item, qty }],
+        `Fulfilled from pending — ${item.sale.saleNo}`,
+      ),
+    );
 
-    return { fulfilled: qty, remaining: item.pendingQuantity - qty };
+    return { fulfilled: qty, remaining: remainingBefore - qty, newSale };
   },
 };

@@ -129,7 +129,12 @@ export default function SalesPage() {
       queryClient.invalidateQueries({ queryKey: ['sale-pending'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
-      toast.success('Fulfilled', `${res.fulfilled} dispatched${res.remaining > 0 ? `, ${res.remaining} still pending` : ''}.`);
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['dealers'] });
+      toast.success(
+        'Fulfilled',
+        `${res.fulfilled} dispatched${res.remaining > 0 ? `, ${res.remaining} still pending` : ''}. Invoice ${res.newSale.saleNo} generated.`,
+      );
     },
     onError: (err: Error) => toast.error('Could not fulfill', err.message),
   });

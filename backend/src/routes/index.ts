@@ -16,6 +16,7 @@ import expenseRoutes from './expense.routes';
 import salaryRoutes from './salary.routes';
 import reportRoutes from './report.routes';
 import dashboardRoutes from './dashboard.routes';
+import notificationRoutes from './notification.routes';
 
 const router = Router();
 
@@ -38,5 +39,6 @@ router.use('/expenses', expenseRoutes); // admin-only
 router.use('/salaries', salaryRoutes); // admin-only
 router.use('/reports', reportRoutes); // admin-only
 router.use('/dashboard', dashboardRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

@@ -149,10 +149,18 @@ export function SaleFormDialog({ open, onOpenChange, sale }: Props) {
       };
       return editing ? salesApi.update(sale!.id, payload) : salesApi.create(payload);
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(variables.status === 'COMPLETED' ? 'Sale completed — stock updated' : 'Sale saved as draft');
+      if (data.shortages && data.shortages.length > 0) {
+        toast.error(
+          'Stock kam hai — kuch items pending',
+          data.shortages.map((s) => `${s.productName}: ${s.pendingQuantity} pending`).join(', ') +
+            ' — stock daaliye, invoice khud ban jayega.',
+        );
+      } else {
+        toast.success(variables.status === 'COMPLETED' ? 'Sale completed — stock updated' : 'Sale saved as draft');
+      }
       onOpenChange(false);
     },
     onError: (err: Error) => toast.error('Could not save sale', err.message),
