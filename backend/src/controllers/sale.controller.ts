@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import { AuditAction } from '@prisma/client';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { sendSuccess } from '@/utils/apiResponse';
+import { logAudit } from '@/utils/audit';
 import { saleService, SaleListQuery } from '@/services/sale.service';
 
 export const saleController = {
@@ -11,7 +13,9 @@ export const saleController = {
     return sendSuccess(res, await saleService.get(req.params.id));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
-    return sendSuccess(res, await saleService.create(req.body), 'Sale saved', 201);
+    const sale = await saleService.create(req.body);
+    logAudit(req, AuditAction.SALE_CREATE, `Created sale ${sale.saleNo ?? sale.id}`);
+    return sendSuccess(res, sale, 'Sale saved', 201);
   }),
   update: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await saleService.update(req.params.id, req.body), 'Sale updated');
@@ -21,6 +25,7 @@ export const saleController = {
   }),
   remove: asyncHandler(async (req: Request, res: Response) => {
     await saleService.remove(req.params.id);
+    logAudit(req, AuditAction.SALE_DELETE, `Deleted sale ${req.params.id}`);
     return sendSuccess(res, null, 'Sale deleted');
   }),
   createReturn: asyncHandler(async (req: Request, res: Response) => {

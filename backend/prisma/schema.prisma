@@ -25,6 +25,19 @@ enum AuditAction {
   LOGOUT
   PASSWORD_CHANGE
   PROFILE_UPDATE
+  SALE_CREATE
+  SALE_DELETE
+  PURCHASE_CREATE
+  PURCHASE_DELETE
+  PAYMENT_CREATE
+  PAYMENT_UPDATE
+  PAYMENT_DELETE
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  PASSWORD_RESET
+  BALANCE_ADJUSTMENT
+  SETTINGS_UPDATE
 }
 
 model User {
@@ -39,6 +52,8 @@ model User {
   profileImage String?   @map("profile_image")
   isActive     Boolean   @default(true) @map("is_active")
   lastLogin    DateTime? @map("last_login")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 

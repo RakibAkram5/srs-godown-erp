@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import { AuditAction } from '@prisma/client';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { sendSuccess } from '@/utils/apiResponse';
+import { logAudit } from '@/utils/audit';
 import { purchaseService, PurchaseListQuery } from '@/services/purchase.service';
 
 export const purchaseController = {
@@ -11,7 +13,9 @@ export const purchaseController = {
     return sendSuccess(res, await purchaseService.get(req.params.id));
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
-    return sendSuccess(res, await purchaseService.create(req.body), 'Purchase saved', 201);
+    const purchase = await purchaseService.create(req.body);
+    logAudit(req, AuditAction.PURCHASE_CREATE, `Created purchase ${purchase.purchaseNo ?? purchase.id}`);
+    return sendSuccess(res, purchase, 'Purchase saved', 201);
   }),
   update: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await purchaseService.update(req.params.id, req.body), 'Purchase updated');
@@ -21,6 +25,7 @@ export const purchaseController = {
   }),
   remove: asyncHandler(async (req: Request, res: Response) => {
     await purchaseService.remove(req.params.id);
+    logAudit(req, AuditAction.PURCHASE_DELETE, `Deleted purchase ${req.params.id}`);
     return sendSuccess(res, null, 'Purchase deleted');
   }),
 

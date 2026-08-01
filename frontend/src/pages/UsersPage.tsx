@@ -32,6 +32,7 @@ import { usersApi, type CreateUserPayload } from '@/services/users.service';
 import { GRANTABLE_MODULES } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/utils/toast';
+import { isStrongPassword, PASSWORD_POLICY_HINT } from '@/utils/validation';
 import type { User } from '@/types';
 
 type Role = 'ADMIN' | 'MANAGER' | 'EMPLOYEE';
@@ -88,7 +89,7 @@ function UserFormDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
     if (!name.trim()) return toast.error('Name required');
     if (!editing && username.trim().length < 3) return toast.error('Username too short', 'At least 3 characters.');
     if (!email.trim()) return toast.error('Email required');
-    if (!editing && password.length < 6) return toast.error('Weak password', 'At least 6 characters.');
+    if (!editing && !isStrongPassword(password)) return toast.error('Weak password', PASSWORD_POLICY_HINT);
     mutation.mutate();
   }
 
@@ -122,6 +123,7 @@ function UserFormDialog({ open, onOpenChange, editing }: { open: boolean; onOpen
               <div className="space-y-2">
                 <Label htmlFor="upass">Password</Label>
                 <Input id="upass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -190,10 +192,11 @@ function ResetPasswordDialog({ user, onClose }: { user: User | null; onClose: ()
         <div className="space-y-2">
           <Label htmlFor="newpass">New password</Label>
           <Input id="newpass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <p className="text-xs text-muted-foreground">{PASSWORD_POLICY_HINT}</p>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button loading={mutation.isPending} disabled={password.length < 6} onClick={() => mutation.mutate()}>Reset</Button>
+          <Button loading={mutation.isPending} disabled={!isStrongPassword(password)} onClick={() => mutation.mutate()}>Reset</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

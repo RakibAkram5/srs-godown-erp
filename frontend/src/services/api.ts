@@ -51,10 +51,18 @@ api.interceptors.request.use((config) => {
 });
 
 /* ── Response interceptor: normalize + auto-refresh ─────── */
-export interface NormalizedError {
+// A real Error subclass — plain rejected objects fail `instanceof Error`
+// checks used throughout the app to decide whether to show the server's
+// actual message vs. a generic fallback.
+export class NormalizedError extends Error {
   status: number;
-  message: string;
   details?: unknown;
+  constructor(status: number, message: string, details?: unknown) {
+    super(message);
+    this.name = 'NormalizedError';
+    this.status = status;
+    this.details = details;
+  }
 }
 
 function forceLogout() {
@@ -109,11 +117,7 @@ api.interceptors.response.use(
       error.response?.data?.message ??
       (status === 0 ? 'Network error — check your connection' : 'Something went wrong');
 
-    return Promise.reject({
-      status,
-      message,
-      details: error.response?.data?.details,
-    } as NormalizedError);
+    return Promise.reject(new NormalizedError(status, message, error.response?.data?.details));
   },
 );
 

@@ -26,4 +26,10 @@ export const userRepository = {
   updatePassword(id: string, password: string) {
     return prisma.user.update({ where: { id }, data: { password } });
   },
+  recordFailedLogin(id: string, failedLoginAttempts: number, lockedUntil: Date | null) {
+    return prisma.user.update({ where: { id }, data: { failedLoginAttempts, lockedUntil } });
+  },
+  resetFailedAttempts(id: string) {
+    return prisma.user.update({ where: { id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
+  },
 };

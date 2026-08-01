@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import { AuditAction } from '@prisma/client';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { sendSuccess } from '@/utils/apiResponse';
+import { logAudit } from '@/utils/audit';
 import { dealerService } from '@/services/dealer.service';
 
 export const dealerController = {
@@ -15,7 +17,9 @@ export const dealerController = {
     return sendSuccess(res, await dealerService.ledger(req.params.id));
   }),
   adjust: asyncHandler(async (req: Request, res: Response) => {
-    return sendSuccess(res, await dealerService.adjust(req.params.id, Number(req.body.amount), req.body.reason), 'Balance adjusted');
+    const adjustment = await dealerService.adjust(req.params.id, Number(req.body.amount), req.body.reason);
+    logAudit(req, AuditAction.BALANCE_ADJUSTMENT, `Dealer ${req.params.id} balance adjusted by ${adjustment.amount} — ${adjustment.reason}`);
+    return sendSuccess(res, adjustment, 'Balance adjusted');
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await dealerService.create(req.body), 'Dealer created', 201);

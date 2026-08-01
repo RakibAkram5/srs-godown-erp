@@ -16,11 +16,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authService } from '@/services/auth.service';
 import { toast } from '@/utils/toast';
+import { password as strongPassword, PASSWORD_POLICY_HINT } from '@/utils/validation';
 
 const schema = z
   .object({
     currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+    newPassword: strongPassword,
     confirmPassword: z.string().min(1, 'Please confirm your new password'),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
@@ -107,7 +108,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change password</DialogTitle>
-          <DialogDescription>Use at least 8 characters for a strong password.</DialogDescription>
+          <DialogDescription>{PASSWORD_POLICY_HINT}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="space-y-4">

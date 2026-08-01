@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { strongPassword } from './shared';
 
 const optionalString = z.string().trim().optional().or(z.literal('')).nullable();
 
@@ -16,7 +17,7 @@ export const createUserSchema = z.object({
   body: z.object({
     ...baseUser,
     username: z.string().trim().min(3, 'Username must be at least 3 characters'),
-    password: z.string().min(6, 'Password must be at least 6 characters'),
+    password: strongPassword,
   }),
 });
 
@@ -28,7 +29,7 @@ export const updateUserSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  body: z.object({ password: z.string().min(6, 'Password must be at least 6 characters') }),
+  body: z.object({ password: strongPassword }),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>['body'];

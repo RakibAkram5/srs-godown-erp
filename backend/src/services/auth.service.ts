@@ -39,6 +39,9 @@ function toPublicUser(user: User) {
 
 export type PublicUser = ReturnType<typeof toPublicUser>;
 
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
 async function issueTokens(userId: string, username: string, role: string) {
   const accessToken = signAccessToken({ sub: userId, username, role });
   const refreshToken = signRefreshToken(userId);
@@ -60,6 +63,11 @@ export const authService = {
       throw ApiError.forbidden('Your account has been disabled. Contact your administrator.');
     }
 
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
+      throw ApiError.locked(`Too many failed attempts. Try again in ${minutesLeft} minute(s).`);
+    }
+
     const ok = await comparePassword(input.password, user.password);
     if (!ok) {
       const ua = parseUserAgent(ctx.userAgent);
@@ -71,7 +79,23 @@ export const authService = {
         os: ua.os,
         status: 'FAILED',
       });
+
+      const attempts = user.failedLoginAttempts + 1;
+      const shouldLock = attempts >= MAX_FAILED_ATTEMPTS;
+      await userRepository.recordFailedLogin(
+        user.id,
+        shouldLock ? 0 : attempts,
+        shouldLock ? new Date(Date.now() + LOCKOUT_MINUTES * 60_000) : null,
+      );
+
+      if (shouldLock) {
+        throw ApiError.locked(`Too many failed attempts. Your account is locked for ${LOCKOUT_MINUTES} minutes.`);
+      }
       throw ApiError.unauthorized('Invalid username or password');
+    }
+
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await userRepository.resetFailedAttempts(user.id);
     }
 
     const ua = parseUserAgent(ctx.userAgent);

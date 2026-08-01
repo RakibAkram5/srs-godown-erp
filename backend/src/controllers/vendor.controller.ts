@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import { AuditAction } from '@prisma/client';
 import { asyncHandler } from '@/utils/asyncHandler';
 import { sendSuccess } from '@/utils/apiResponse';
+import { logAudit } from '@/utils/audit';
 import { vendorService } from '@/services/vendor.service';
 
 export const vendorController = {
@@ -18,7 +20,9 @@ export const vendorController = {
     return sendSuccess(res, await vendorService.ledger(req.params.id));
   }),
   adjust: asyncHandler(async (req: Request, res: Response) => {
-    return sendSuccess(res, await vendorService.adjust(req.params.id, Number(req.body.amount), req.body.reason), 'Balance adjusted');
+    const adjustment = await vendorService.adjust(req.params.id, Number(req.body.amount), req.body.reason);
+    logAudit(req, AuditAction.BALANCE_ADJUSTMENT, `Vendor ${req.params.id} balance adjusted by ${adjustment.amount} — ${adjustment.reason}`);
+    return sendSuccess(res, adjustment, 'Balance adjusted');
   }),
   create: asyncHandler(async (req: Request, res: Response) => {
     return sendSuccess(res, await vendorService.create(req.body), 'Vendor created', 201);

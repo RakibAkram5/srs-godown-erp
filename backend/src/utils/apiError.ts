@@ -21,6 +21,9 @@ export class ApiError extends Error {
   static forbidden(msg = 'Forbidden') {
     return new ApiError(403, msg);
   }
+  static locked(msg = 'Account temporarily locked') {
+    return new ApiError(423, msg);
+  }
   static notFound(msg = 'Not found') {
     return new ApiError(404, msg);
   }
